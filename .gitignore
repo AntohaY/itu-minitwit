@@ -1,0 +1,51 @@
+# --------------------
+# Virtual environments
+# --------------------
+venv/
+.env/
+.venv/
+ENV/
+env/
+
+# --------------------
+# Python cache & build
+# --------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# --------------------
+# Flask / app specific
+# --------------------
+instance/
+.webassets-cache
+*.log
+
+# --------------------
+# Environment variables
+# --------------------
+.env.local
+.env.dev
+.env.prod
+
+# --------------------
+# Testing / coverage
+# --------------------
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --------------------
+# IDE / editor
+# --------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --------------------
+# OS files
+# --------------------
+.DS_Store
+Thumbs.db
