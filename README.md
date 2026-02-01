@@ -4,7 +4,6 @@
 python3 -m venv venv
 source venv/bin/activate      # macOS/Linux
 pip install -r requirements.txt
-python app.py
 
 ## Git and branches
 Naming convention
