@@ -1,0 +1,48 @@
+# we need to change docker compose file to make it generic and working with golang
+version: '3'
+services:
+  dbserver:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=minitwit
+    healthcheck:
+      test: mongosh --quiet --eval 'db.runCommand("ping").ok' localhost:27017/test
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - minitwit-network
+
+  webserver:
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+    depends_on:
+      dbserver:
+        condition: service_healthy
+    ports:
+      - "5001:5000" # Depending on the OS using port 5000 might be reserved. If not, change to "5000:5000" or something similar.
+    environment:
+      - DB_IP=dbserver
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+        - minitwit-network
+
+  clidownload:
+    image: curlimages/curl
+    depends_on:
+      webserver:
+        condition: service_healthy
+    networks:
+      - minitwit-network
+    entrypoint: sh -c  "curl http://webserver:5000"
+
+networks:
+  minitwit-network:
+    driver: bridge
