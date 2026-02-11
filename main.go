@@ -37,6 +37,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 )
 
@@ -47,9 +48,11 @@ type Configuration struct {
 }
 
 type User struct {
-	ID       primitive.ObjectID `bson:"_id"`
-	Username string             `bson:"username"`
-	Email    string             `bson:"email"`
+	ID       primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
+	Username string             `json:"username" bson:"username"`
+	Email    string             `json:"email" bson:"email"`
+	PW       string             `json:"pw" bson:"pw"`
+	HashedPW string             `json:"hashedpw" bson:"hashedpw"`
 }
 
 // global variables
@@ -59,7 +62,19 @@ var db *mongo.Database // Specific handle to the "test" database
 var store = sessions.NewCookieStore([]byte("development key"))
 
 func main() {
-	// Load Configuration
+	// init routes
+	r := mux.NewRouter()
+	r.Use(beforeAfterMiddleware)
+	r.HandleFunc("/", TimelineHandler)
+	r.HandleFunc("/register", RegisterHandler)
+	r.HandleFunc("/login", LoginHandler)
+	r.HandleFunc("/logout", LogoutHandler)
+
+	// r.HandleFunc("/add_message")
+	// r.HandleFunc("/{username}/unfollow")
+	// r.HandleFunc("/{username}/follow")
+	// r.HandleFunc("/{username}")
+	// r.HandleFunc("/public")
 	config = Configuration{
 		Debug:     true,              // Default: DEBUG=True
 		SecretKey: "development key", // Default: SECRET_KEY='development key'
@@ -71,38 +86,7 @@ func main() {
 		config.SecretKey = envKey
 	}
 
-	// Setup Database URI (Replaces db_ip = os.getenv / app.config["MONGO_URI"])
-	dbIP := os.Getenv("DB_IP")
-	if dbIP == "" {
-		dbIP = "localhost" // Fallback if running outside Docker
-	}
-	config.MongoURI = fmt.Sprintf("mongodb://%s:27017", dbIP)
-
-	// Connect to MongoDB (Replaces mongo = PyMongo(app))
-	fmt.Println("Connecting to:", config.MongoURI)
-
-	// Create a context with a 10-second timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	// Connect
-	clientOptions := options.Client().ApplyURI(config.MongoURI)
-	var err error
-	dbClient, err = mongo.Connect(ctx, clientOptions)
-	if err != nil {
-		log.Fatal("Connection failed:", err)
-	}
-
-	// Ping to verify
-	err = dbClient.Ping(ctx, nil)
-	if err != nil {
-		log.Fatal("Could not ping MongoDB:", err)
-	}
-
-	db = dbClient.Database("test")
-	fmt.Println("Successfully connected to MongoDB!")
-	fmt.Printf("Loaded Config: Debug=%v, SecretKey=%s\n", config.Debug, config.SecretKey)
-	http.HandleFunc("/", timeline)
+	// Load Configuration
 	log.Fatal(http.ListenAndServe(":5000", AuthMiddleware(http.DefaultServeMux)))
 }
 
@@ -164,7 +148,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func timeline(w http.ResponseWriter, r *http.Request) {
+func TimelineHandler(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value("user") //we checked if visitor has valus of user
 	if user != nil {
 		u := user.(User)
@@ -172,4 +156,147 @@ func timeline(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.Write([]byte("Hello! You are not logged in. This is the public timeline."))
 	}
+}
+
+func RegisterHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	user := r.Context().Value("user")
+	if user == nil {
+		http.Redirect(w, r, "/timeline", http.StatusFound)
+	}
+
+	err := ""
+	if r.Method == http.MethodPost {
+		if r.Form.Get("username") == "" {
+			err = "You have to enter a username"
+		} else if r.Form.Get("email") == "" || !strings.Contains(r.Form.Get("email"), "@") {
+			err = "You have to enter a valid email address"
+		} else if r.Form.Get("password") == "" {
+			err = "You have to enter a password"
+		} else if r.Form.Get("password") != r.Form.Get("password2") {
+			err = "The two passwords do not match"
+		} else if getUserID(r.Form.Get("username")) != primitive.NilObjectID {
+			err = "The username is already taken"
+		} else {
+			db.Collection("user").InsertOne(ctx, user)
+			http.Redirect(w, r, "/login", http.StatusFound)
+		}
+	}
+
+	if err != "" {
+		log.Fatal(err)
+	}
+}
+
+func LoginHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	user := r.Context().Value("user")
+	if user != nil {
+		http.Redirect(w, r, "/timeline", http.StatusFound)
+	}
+
+	if r.Method == http.MethodPost {
+		var foundUser User
+
+		user := user.(User)
+		filter := bson.M{"username": user.Username}
+
+		dberr := db.Collection("users").FindOne(ctx, filter).Decode(&foundUser)
+		if dberr != nil {
+			if dberr == mongo.ErrNoDocuments {
+				log.Fatal("User not found")
+			} else {
+				log.Fatal(dberr)
+			}
+		} else {
+			if !checkPasswordHash() {
+				log.Fatal("Password doesn match")
+			} else {
+				session, _ := store.Get(r, "minitwit-session")
+				session.Values["user_id"] = user.ID
+				http.Redirect(w, r, "/timeline", http.StatusFound)
+			}
+		}
+	}
+
+}
+
+func LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "minitwit-session")
+	session.AddFlash("You were logged out")
+	for k := range session.Values {
+		delete(session.Values, k)
+	}
+	http.Redirect(w, r, "/public", http.StatusFound)
+}
+
+func beforeAfterMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("Executing before request logic")
+		ResolveClientDB()
+		ctx := context.WithValue(r.Context(), "user", nil) // is nil okay?
+		r = r.WithContext(ctx)
+
+		// Call the next handler in the chain
+		next.ServeHTTP(w, r)
+
+		fmt.Println("Executing after request logic")
+		CloseClientDB()
+	})
+}
+
+func ResolveClientDB() *mongo.Client {
+	// Setup Database URI (Replaces db_ip = os.getenv / app.config["MONGO_URI"])
+	dbIP := os.Getenv("DB_IP")
+	if dbIP == "" {
+		dbIP = "localhost" // Fallback if running outside Docker
+	}
+	config.MongoURI = fmt.Sprintf("mongodb://%s:27017", dbIP)
+
+	// Connect to MongoDB (Replaces mongo = PyMongo(app))
+	fmt.Println("Connecting to:", config.MongoURI)
+
+	// Create a context with a 10-second timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Connect
+	clientOptions := options.Client().ApplyURI(config.MongoURI)
+	var err error
+	dbClient, err = mongo.Connect(ctx, clientOptions)
+	if err != nil {
+		log.Fatal("Connection failed:", err)
+	}
+
+	// Ping to verify
+	err = dbClient.Ping(ctx, nil)
+	if err != nil {
+		log.Fatal("Could not ping MongoDB:", err)
+	}
+
+	db = dbClient.Database("test")
+	fmt.Println("Successfully connected to MongoDB!")
+	fmt.Printf("Loaded Config: Debug=%v, SecretKey=%s\n", config.Debug, config.SecretKey)
+	return dbClient
+}
+
+func CloseClientDB() {
+	if dbClient == nil {
+		return
+	}
+
+	err := dbClient.Disconnect(context.TODO())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("Connection to MongoDB closed.")
+}
+
+func checkPasswordHash() bool {
+	return true
 }
