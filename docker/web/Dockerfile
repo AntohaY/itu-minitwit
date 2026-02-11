@@ -21,7 +21,9 @@ FROM golang:1.25
 WORKDIR /usr/src/app
 
 # 2. Copy files
-COPY . .
+COPY new/ .
+COPY new/templates/ ./templates/
+COPY static/ ./static/
 
 # 3. BUILD the app (This creates a file named 'minitwit-server')
 RUN go build -o minitwit-server main.go
