@@ -154,9 +154,9 @@ func main() {
 
 	router := mux.NewRouter()
 	router.HandleFunc("/", PublicTimelineHandler).Methods("GET")
-	router.HandleFunc("/{username}", userTimeline).Methods("GET")
-	router.HandleFunc("/{username}/follow", followUser).Methods("GET")
-	router.HandleFunc("/{username}/unfollow", unfollowUser).Methods("GET")
+	router.HandleFunc("/user/{username}", userTimeline).Methods("GET")
+	router.HandleFunc("/user/{username}/follow", followUser).Methods("GET")
+	router.HandleFunc("/user/{username}/unfollow", unfollowUser).Methods("GET")
 	router.HandleFunc("/add_message", AddMessageHandler).Methods("POST")
 	log.Fatal(http.ListenAndServe(":5000", AuthMiddleware(router)))
 }
@@ -217,16 +217,6 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		// 5. Pass the request to the next handler
 		next.ServeHTTP(w, r)
 	})
-}
-
-func timeline(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value("user") //we checked if visitor has valus of user
-	if user != nil {
-		u := user.(User)
-		fmt.Fprintf(w, "Hello logged in user: %s", u.Username)
-	} else {
-		w.Write([]byte("Hello! You are not logged in. This is the public timeline."))
-	}
 }
 
 func userTimeline(w http.ResponseWriter, r *http.Request) {

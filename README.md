@@ -13,8 +13,24 @@ Naming convention:
 ### docker compose up --build
 
 ## Local testing
-run this command to connect to database in docker
-docker run -d --name my-mongo -p 27017:27017 mongo:latest
+### Commands to check functionality
 
-run this command to run local environment <br>
-go run main.go
+####
+    1. you can do docker composition
+        docker-compose up --build
+        docker composition is set for port 5001! -> http://localhost:5001
+    2. do it manually but than don't do step 1
+    start a temporary database
+        docker run --name my-test-mongo -p 27017:27017 -d mongo:latest
+    
+    check if docker container is runing
+    docker ps
+    if not, than start it
+        docker start my-test-mongo
+    
+    download valid dependencies
+        go mod tidy
+    
+    check if it works
+        go run main.go
+####
