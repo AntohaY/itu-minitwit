@@ -3,6 +3,7 @@ module minitwit
 go 1.23
 
 require (
+	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/sessions v1.4.0
 	go.mongodb.org/mongo-driver v1.17.9
 )
