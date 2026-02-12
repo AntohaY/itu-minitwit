@@ -26,6 +26,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"      // replace print() in python
+	"html/template" // for rendering HTML templates
 	"log"      // for error reporting
 	"net/http" // built-in library which replace flask
 	"os"       // read environment variables (for example DB_IP)
@@ -37,6 +38,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
+	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
 )
 
@@ -48,8 +50,19 @@ type Configuration struct {
 
 type User struct {
 	ID       primitive.ObjectID `bson:"_id"`
+	UserID   int64              `bson:"user_id"`
 	Username string             `bson:"username"`
 	Email    string             `bson:"email"`
+	PWHash   string             `bson:"pw_hash"`
+}
+
+type Message struct {
+	ID        primitive.ObjectID `bson:"_id"`
+	MessageID int64              `bson:"message_id"`
+	AuthorID  int64              `bson:"author_id"`
+	Text      string             `bson:"text"`
+	PubDate   int64              `bson:"pub_date"`
+	Flagged   int                `bson:"flagged"`
 }
 
 // global variables
@@ -57,6 +70,8 @@ var config Configuration
 var dbClient *mongo.Client
 var db *mongo.Database // Specific handle to the "test" database
 var store = sessions.NewCookieStore([]byte("development key"))
+
+const PER_PAGE = 30  // Same as Python version
 
 func main() {
 	// Load Configuration
@@ -102,8 +117,14 @@ func main() {
 	db = dbClient.Database("test")
 	fmt.Println("Successfully connected to MongoDB!")
 	fmt.Printf("Loaded Config: Debug=%v, SecretKey=%s\n", config.Debug, config.SecretKey)
-	http.HandleFunc("/", timeline)
-	log.Fatal(http.ListenAndServe(":5000", AuthMiddleware(http.DefaultServeMux)))
+
+	router := mux.NewRouter()
+	router.HandleFunc("/", timeline).Methods("GET")
+	router.HandleFunc("/{username}", userTimeline).Methods("GET")
+	router.HandleFunc("/{username}/follow", followUser).Methods("GET")
+	router.HandleFunc("/{username}/unfollow", unfollowUser).Methods("GET")
+
+	log.Fatal(http.ListenAndServe(":5000", AuthMiddleware(router)))
 }
 
 func getUserID(username string) primitive.ObjectID {
@@ -172,4 +193,148 @@ func timeline(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.Write([]byte("Hello! You are not logged in. This is the public timeline."))
 	}
+}
+
+func userTimeline(w http.ResponseWriter, r *http.Request) {
+	username := mux.Vars(r)["username"]
+	
+	// Query: select * from user where username = ? (one=True)
+	var profileUser User
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := db.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&profileUser)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)  // abort(404)
+		return
+	}
+	
+	// followed = False
+	followed := false
+	// if g.user:
+	if currentUser := r.Context().Value("user"); currentUser != nil {
+		user := currentUser.(User)
+		// Query: select 1 from follower where who_id = ? and whom_id = ? (one=True)
+		var result struct{}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		err := db.Collection("follower").FindOne(ctx, bson.M{
+			"who_id":  user.UserID,
+			"whom_id": profileUser.UserID,
+		}).Decode(&result)
+		followed = (err == nil)  // is not None
+	}
+	
+	// Query: select message.*, user.* from message, user where
+	//        user.user_id = message.author_id and user.user_id = ?
+	//        order by message.pub_date desc limit ?
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	opts := options.Find().SetSort(bson.M{"pub_date": -1}).SetLimit(PER_PAGE)
+	cursor, _ := db.Collection("message").Find(ctx, bson.M{
+		"author_id": profileUser.UserID,
+		"flagged":   0,
+	}, opts)
+	var messages []Message
+	cursor.All(ctx, &messages)
+	
+	// Retrieve flash messages from session
+	session, _ := store.Get(r, "minitwit-session")
+	flashes := session.Flashes()
+	session.Save(r, w)
+	
+	// return render_template('timeline.html', messages=..., followed=..., profile_user=...)
+	tmpl, err := template.ParseFiles("templates/timeline.html")
+	if err != nil {
+		http.Error(w, "Template error", http.StatusInternalServerError)
+		return
+	}
+	tmpl.Execute(w, map[string]interface{}{
+		"messages":     messages,
+		"followed":     followed,
+		"profile_user": profileUser,
+		"user":         r.Context().Value("user"),
+		"flashes":      flashes,
+	})
+}
+
+func followUser(w http.ResponseWriter, r *http.Request) {
+	// if not g.user: abort(401)
+	currentUser := r.Context().Value("user")
+	if currentUser == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)  // abort(401)
+		return
+	}
+	user := currentUser.(User)
+	username := mux.Vars(r)["username"]
+	
+	// whom_id = get_user_id(username)
+	var result struct {
+		UserID int64 `bson:"user_id"`
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := db.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&result)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)  // if whom_id is None: abort(404)
+		return
+	}
+	whomID := result.UserID
+	
+	// g.db.execute('insert into follower (who_id, whom_id) values (?, ?)', [session['user_id'], whom_id])
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	db.Collection("follower").InsertOne(ctx, bson.M{
+		"who_id":  user.UserID,
+		"whom_id": whomID,
+	})
+	// g.db.commit() - MongoDB auto-commits
+	
+	// flash('You are now following "%s"' % username)
+	session, _ := store.Get(r, "minitwit-session")
+	session.AddFlash("You are now following \"" + username + "\"")
+	session.Save(r, w)
+	
+	// return redirect(url_for('user_timeline', username=username))
+	http.Redirect(w, r, "/"+username, http.StatusSeeOther)
+}
+
+func unfollowUser(w http.ResponseWriter, r *http.Request) {
+	// if not g.user: abort(401)
+	currentUser := r.Context().Value("user")
+	if currentUser == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)  // abort(401)
+		return
+	}
+	user := currentUser.(User)
+	username := mux.Vars(r)["username"]
+	
+	// whom_id = get_user_id(username)
+	var result struct {
+		UserID int64 `bson:"user_id"`
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := db.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&result)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)  // if whom_id is None: abort(404)
+		return
+	}
+	whomID := result.UserID
+	
+	// g.db.execute('delete from follower where who_id=? and whom_id=?', [session['user_id'], whom_id])
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	db.Collection("follower").DeleteOne(ctx, bson.M{
+		"who_id":  user.UserID,
+		"whom_id": whomID,
+	})
+	// g.db.commit() - MongoDB auto-commits
+	
+	// flash('You are no longer following "%s"' % username)
+	session, _ := store.Get(r, "minitwit-session")
+	session.AddFlash("You are no longer following \"" + username + "\"")
+	session.Save(r, w)
+	
+	// return redirect(url_for('user_timeline', username=username))
+	http.Redirect(w, r, "/"+username, http.StatusSeeOther)
 }
