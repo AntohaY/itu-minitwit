@@ -24,12 +24,13 @@ package main
 import (
 	"context"
 	"crypto/md5"
+	"encoding/base64"
 	"encoding/hex"
-	"fmt"      // replace print() in python
+	"fmt"           // replace print() in python
 	"html/template" // for rendering HTML templates
-	"log"      // for error reporting
-	"net/http" // built-in library which replace flask
-	"os"       // read environment variables (for example DB_IP)
+	"log"           // for error reporting
+	"net/http"      // built-in library which replace flask
+	"os"            // read environment variables (for example DB_IP)
 	"strings"
 	"time"
 
@@ -104,7 +105,7 @@ var dbClient *mongo.Client
 var db *mongo.Database
 var store = sessions.NewCookieStore([]byte("development key"))
 
-const PER_PAGE = 30  // Same as Python version
+const PER_PAGE = 30 // Same as Python version
 
 func main() {
 	// Load Configuration
@@ -237,7 +238,7 @@ func userTimeline(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	err := db.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&profileUser)
 	if err != nil {
-		http.Error(w, "User not found", http.StatusNotFound)  // abort(404)
+		http.Error(w, "User not found", http.StatusNotFound) // abort(404)
 		return
 	}
 
@@ -254,7 +255,7 @@ func userTimeline(w http.ResponseWriter, r *http.Request) {
 			"who_id":  user.UserID,
 			"whom_id": profileUser.UserID,
 		}).Decode(&result)
-		followed = (err == nil)  // is not None
+		followed = (err == nil) // is not None
 	}
 
 	// Query: select message.*, user.* from message, user where
@@ -294,7 +295,7 @@ func followUser(w http.ResponseWriter, r *http.Request) {
 	// if not g.user: abort(401)
 	currentUser := r.Context().Value("user")
 	if currentUser == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)  // abort(401)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized) // abort(401)
 		return
 	}
 	user := currentUser.(User)
@@ -308,7 +309,7 @@ func followUser(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	err := db.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&result)
 	if err != nil {
-		http.Error(w, "User not found", http.StatusNotFound)  // if whom_id is None: abort(404)
+		http.Error(w, "User not found", http.StatusNotFound) // if whom_id is None: abort(404)
 		return
 	}
 	whomID := result.UserID
@@ -335,7 +336,7 @@ func unfollowUser(w http.ResponseWriter, r *http.Request) {
 	// if not g.user: abort(401)
 	currentUser := r.Context().Value("user")
 	if currentUser == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)  // abort(401)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized) // abort(401)
 		return
 	}
 	user := currentUser.(User)
@@ -349,7 +350,7 @@ func unfollowUser(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	err := db.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&result)
 	if err != nil {
-		http.Error(w, "User not found", http.StatusNotFound)  // if whom_id is None: abort(404)
+		http.Error(w, "User not found", http.StatusNotFound) // if whom_id is None: abort(404)
 		return
 	}
 	whomID := result.UserID
