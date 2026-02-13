@@ -8,7 +8,7 @@
 //start a temporary database
 //docker run --name my-test-mongo -p 27017:27017 -d mongo:latest
 
-//check if docker container is runing
+//check if docker container is running
 //docker ps
 //if not, than start it
 //docker start my-test-mongo
@@ -57,11 +57,12 @@ type User struct {
 
 type Message struct {
 	ID        primitive.ObjectID `bson:"_id"`
-	MessageID int64              `bson:"message_id"`
-	AuthorID  int64              `bson:"author_id"`
+	MessageID int              `bson:"message_id"`
+	AuthorID  int              `bson:"author_id"`
 	Text      string             `bson:"text"`
-	PubDate   int64              `bson:"pub_date"`
+	PubDate   int              `bson:"pub_date"`
 	Flagged   int                `bson:"flagged"`
+	Username  string             `bson:"username"`
 }
 
 type BaseContext struct {
@@ -71,28 +72,19 @@ type BaseContext struct {
 
 type TimelinePage struct {
 	BaseContext // Embeds User and Flashes automatically
-	Messages    []TimelineMessage
+	Messages    []Message
 	ProfileUser *User
 	PageTitle   string // Needed for {{ .PageTitle }}
 	PageID      string // Needed for "active" tab logic (public vs user)
 }
-type TimelineMessage struct {
-	MessageID int
-	AuthorID  int
-	Text      string
-	PubDate   int // or time.Time
-	Flagged   bool
-	Username  string // From the joined User table
-	Email     string // From the joined User table
-
-}
-type TimelineData struct {
+type TimelineUserData struct {
 	PageTitle   string // Replaces self.title() logic
 	PageID      string // Replaces request.endpoint logic ("public", "user", "personal")
-	Messages    []TimelineMessage
+	Messages    []Message
 	ProfileUser *User // Can be nil if not on a user profile
 	CurrentUser *User // Represents g.user
 	IsFollowing bool  // Replaces 'followed' boolean
+	Flashes     []interface{}
 }
 
 // global variables
@@ -238,7 +230,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if errMsg != "" {
 		log.Println("Registration error:", errMsg)
 	}
-	RenderTemplate(w, "register.html")
+	RenderTemplate(w, "register.html", nil)
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -280,7 +272,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	RenderTemplate(w, "login.html")
+	RenderTemplate(w, "login.html", nil)
 }
 
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
@@ -359,14 +351,14 @@ func checkPasswordHash(password, hashedPW string) bool {
 	return password == hashedPW
 }
 
-func RenderTemplate(w http.ResponseWriter, html string) {
+func RenderTemplate(w http.ResponseWriter, html string, data interface{}) {
 	parsedTemplate, err := template.ParseFiles("./templates/" + html)
 	if err != nil {
 		log.Printf("Error loading template %s: %v", html, err)
 		http.Error(w, "Template not found", http.StatusInternalServerError)
 		return
 	}
-	err = parsedTemplate.Execute(w, nil)
+	err = parsedTemplate.Execute(w, data)
 	if err != nil {
 		log.Printf("Error executing template %s: %v", html, err)
 		http.Error(w, "Template error", http.StatusInternalServerError)
@@ -420,19 +412,14 @@ func userTimeline(w http.ResponseWriter, r *http.Request) {
 	flashes := session.Flashes()
 	session.Save(r, w)
 
-	// return render_template('timeline.html', messages=..., followed=..., profile_user=...)
-	tmpl, err := template.ParseFiles("templates/timeline.html")
-	if err != nil {
-		http.Error(w, "Template error", http.StatusInternalServerError)
-		return
+	data := TimelineUserData{
+		Messages:    messages,
+		IsFollowing: followed,
+		ProfileUser: &profileUser,
+		CurrentUser: currentUser,
+		Flashes:     []interface{},
 	}
-	tmpl.Execute(w, map[string]interface{}{
-		"messages":     messages,
-		"followed":     followed,
-		"profile_user": profileUser,
-		"user":         r.Context().Value("user"),
-		"flashes":      flashes,
-	})
+	RenderTemplate(w, "timeline.html", data)
 }
 
 func followUser(w http.ResponseWriter, r *http.Request) {
@@ -517,7 +504,7 @@ func unfollowUser(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/"+username, http.StatusSeeOther)
 }
 
-func queryDatabaseForMessages(limit int) ([]TimelineMessage, error) {
+func queryDatabaseForMessages(limit int) ([]Message, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -546,7 +533,7 @@ func queryDatabaseForMessages(limit int) ([]TimelineMessage, error) {
 	}
 	defer cursor.Close(ctx)
 
-	var messages []TimelineMessage
+	var messages []Message
 
 	for cursor.Next(ctx) {
 		var result struct {
@@ -563,11 +550,10 @@ func queryDatabaseForMessages(limit int) ([]TimelineMessage, error) {
 			return nil, err
 		}
 
-		messages = append(messages, TimelineMessage{
+		messages = append(messages, Message{
 			Text:     result.Text,
 			PubDate:  int(result.PubDate),
 			Username: result.AuthorInfo.Username,
-			Email:    result.AuthorInfo.Email,
 		})
 	}
 
@@ -575,28 +561,28 @@ func queryDatabaseForMessages(limit int) ([]TimelineMessage, error) {
 }
 
 func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
-	//msgs, err := queryDatabaseForMessages(PER_PAGE)
-	//if err != nil {
-	//	http.Error(w, "Database error: "+err.Error(), 500)
-	//	return
-	//}
+	msgs, err := queryDatabaseForMessages(PER_PAGE)
+	if err != nil {
+		http.Error(w, "Database error: "+err.Error(), 500)
+		return
+	}
 
-	//data := TimelinePage{
-	//	BaseContext: BaseContext{
-	//		User:    getCurrentUser(r),
-	//		Flashes: getFlash(w, r),
-	//	},
-	//	Messages:  msgs,
-	//	PageTitle: "Public Timeline",
-	//	PageID:    "public_timeline",
-	//}
+	data := TimelinePage{
+		BaseContext: BaseContext{
+			User:    getCurrentUser(r),
+			Flashes: getFlash(w, r),
+		},
+		Messages:  msgs,
+		PageTitle: "Public Timeline",
+		PageID:    "public_timeline",
+	}
 
 	//funcMap := template.FuncMap{
 	//	"gravatar":       func(email string) string { return gravatarURL(email, 48) },
 	//	"datetimeformat": formatDatetime, // Mapping the function you already wrote
 	//}
 
-	RenderTemplate(w, "layout.html")
+	RenderTemplate(w, "layout.html", data)
 }
 
 func AddMessageHandler(w http.ResponseWriter, r *http.Request) {

@@ -1,28 +1,35 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MiniTwit</title>
-  <link rel="stylesheet" type="text/css" href="/static/style.css">
-</head>
-<body>
-  <div class="page">
-    <h1>MiniTwit</h1>
-    <div class="navigation">
+<title>{{ block "title" . }}Welcome{{ end }} | MiniTwit</title>
+
+<link rel=stylesheet type=text/css href="/static/style.css">
+
+<div class=page>
+  <h1>MiniTwit</h1>
+
+  <div class=navigation>
+    {{ if .User }}
+      <a href="/timeline">my timeline</a> |
+      <a href="/">public timeline</a> |
+      <a href="/logout">sign out [{{ .User.Username }}]</a>
+    {{ else }}
       <a href="/">public timeline</a> |
       <a href="/register">sign up</a> |
       <a href="/login">sign in</a>
-    </div>
-    <div class="body">
-      <h2>Public Timeline</h2>
-      <ul class="messages">
-        <li><em>There's no message so far.</em></li>
-      </ul>
-    </div>
-    <div class="footer">
-      MiniTwit &mdash; A Go Application
-    </div>
+    {{ end }}
   </div>
-</body>
-</html>
+
+  {{ if .Flashes }}
+  <ul class=flashes>
+    {{ range .Flashes }}
+    <li>{{ . }}</li>
+    {{ end }}
+  </ul>
+  {{ end }}
+
+  <div class=body>
+    {{ template "timeline" . }}{{ end }}
+  </div>
+
+  <div class=footer>
+    MiniTwit &mdash; A Go Application
+  </div>
+</div>
