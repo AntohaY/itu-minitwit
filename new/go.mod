@@ -9,7 +9,7 @@ require (
 
 require (
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/gorilla/mux v1.8.1 // indirect
+	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect

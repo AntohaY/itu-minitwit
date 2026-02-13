@@ -18,28 +18,27 @@
 
 //check if it works
 //go run main.go
-
 package main
 
 import (
-	"context" // needed for the timeout logic
+	"context"
 	"crypto/md5"
+	"encoding/base64"
 	"encoding/hex"
-	"fmt"      // replace print() in python
-	"log"      // for error reporting
-	"net/http" // built-in library which replace flask
-	"os"       // read environment variables (for example DB_IP)
+	"fmt"           // replace print() in python
+	"html/template" // for rendering HTML templates
+	"log"           // for error reporting
+	"net/http"      // built-in library which replace flask
+	"os"            // read environment variables (for example DB_IP)
 	"strings"
-	"text/template"
 	"time"
 
+	"github.com/gorilla/mux"
+	"github.com/gorilla/sessions"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-
-	"github.com/gorilla/mux"
-	"github.com/gorilla/sessions"
 )
 
 type Configuration struct {
@@ -56,31 +55,56 @@ type User struct {
 	HashedPW string             `json:"hashedpw" bson:"hashedpw"`
 }
 
+type Message struct {
+	ID        primitive.ObjectID `bson:"_id"`
+	MessageID int64              `bson:"message_id"`
+	AuthorID  int64              `bson:"author_id"`
+	Text      string             `bson:"text"`
+	PubDate   int64              `bson:"pub_date"`
+	Flagged   int                `bson:"flagged"`
+}
+
+type BaseContext struct {
+	User    *User    // Wraps the current user (replaces g.user)
+	Flashes []string // Replaces get_flashed_messages()
+}
+
+type TimelinePage struct {
+	BaseContext // Embeds User and Flashes automatically
+	Messages    []TimelineMessage
+	ProfileUser *User
+	PageTitle   string // Needed for {{ .PageTitle }}
+	PageID      string // Needed for "active" tab logic (public vs user)
+}
+type TimelineMessage struct {
+	MessageID int
+	AuthorID  int
+	Text      string
+	PubDate   int // or time.Time
+	Flagged   bool
+	Username  string // From the joined User table
+	Email     string // From the joined User table
+
+}
+type TimelineData struct {
+	PageTitle   string // Replaces self.title() logic
+	PageID      string // Replaces request.endpoint logic ("public", "user", "personal")
+	Messages    []TimelineMessage
+	ProfileUser *User // Can be nil if not on a user profile
+	CurrentUser *User // Represents g.user
+	IsFollowing bool  // Replaces 'followed' boolean
+}
+
 // global variables
 var config Configuration
 var dbClient *mongo.Client
 var db *mongo.Database // Specific handle to the "test" database
 var store = sessions.NewCookieStore([]byte("development key"))
 
+const PER_PAGE = 30 // Same as Python version
+
 func main() {
-	// init routes
-	r := mux.NewRouter()
-	r.Use(beforeAfterMiddleware)
-	r.Use(AuthMiddleware)
-
-	// Serve static files
-	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
-
-	r.HandleFunc("/", TimelineHandler)
-	r.HandleFunc("/register", RegisterHandler)
-	r.HandleFunc("/login", LoginHandler)
-	r.HandleFunc("/logout", LogoutHandler)
-
-	// r.HandleFunc("/add_message")
-	// r.HandleFunc("/{username}/unfollow")
-	// r.HandleFunc("/{username}/follow")
-	// r.HandleFunc("/{username}")
-	// r.HandleFunc("/public")
+	// Load Configuration
 	config = Configuration{
 		Debug:     true,              // Default: DEBUG=True
 		SecretKey: "development key", // Default: SECRET_KEY='development key'
@@ -92,11 +116,24 @@ func main() {
 		config.SecretKey = envKey
 	}
 
-	// Initialize database connection at startup
 	ResolveClientDB()
 
-	// Load Configuration
-	log.Fatal(http.ListenAndServe(":5000", r))
+	router := mux.NewRouter()
+	router.Use(beforeAfterMiddleware)
+	router.Use(AuthMiddleware)
+
+	// Serve static files
+	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
+
+	router.HandleFunc("/", PublicTimelineHandler).Methods("GET")
+	router.HandleFunc("/register", RegisterHandler)
+	router.HandleFunc("/login", LoginHandler)
+	router.HandleFunc("/logout", LogoutHandler)
+	router.HandleFunc("/{username}", userTimeline).Methods("GET")
+	router.HandleFunc("/{username}/follow", followUser).Methods("GET")
+	router.HandleFunc("/{username}/unfollow", unfollowUser).Methods("GET")
+	router.HandleFunc("/add_message", AddMessageHandler).Methods("POST")
+	log.Fatal(http.ListenAndServe(":5000", AuthMiddleware(router)))
 }
 
 func getUserID(username string) primitive.ObjectID {
@@ -155,15 +192,6 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		// 5. Pass the request to the next handler
 		next.ServeHTTP(w, r)
 	})
-}
-
-func TimelineHandler(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value("user") //we checked if visitor has valus of user
-	if user != nil {
-		RenderTemplate(w, "timeline.html")
-	} else {
-		RenderTemplate(w, "layout.html")
-	}
 }
 
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
@@ -343,4 +371,314 @@ func RenderTemplate(w http.ResponseWriter, html string) {
 		log.Printf("Error executing template %s: %v", html, err)
 		http.Error(w, "Template error", http.StatusInternalServerError)
 	}
+}
+
+func userTimeline(w http.ResponseWriter, r *http.Request) {
+	username := mux.Vars(r)["username"]
+
+	// Query: select * from user where username = ? (one=True)
+	var profileUser User
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := db.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&profileUser)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound) // abort(404)
+		return
+	}
+
+	// followed = False
+	followed := false
+	// if g.user:
+	if currentUser := r.Context().Value("user"); currentUser != nil {
+		user := currentUser.(User)
+		// Query: select 1 from follower where who_id = ? and whom_id = ? (one=True)
+		var result struct{}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		err := db.Collection("follower").FindOne(ctx, bson.M{
+			"who_id":  user.ID,
+			"whom_id": profileUser.ID,
+		}).Decode(&result)
+		followed = (err == nil) // is not None
+	}
+
+	// Query: select message.*, user.* from message, user where
+	//        user.user_id = message.author_id and user.user_id = ?
+	//        order by message.pub_date desc limit ?
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	opts := options.Find().SetSort(bson.M{"pub_date": -1}).SetLimit(PER_PAGE)
+	cursor, _ := db.Collection("message").Find(ctx, bson.M{
+		"author_id": profileUser.ID,
+		"flagged":   0,
+	}, opts)
+	var messages []Message
+	cursor.All(ctx, &messages)
+
+	// Retrieve flash messages from session
+	session, _ := store.Get(r, "minitwit-session")
+	flashes := session.Flashes()
+	session.Save(r, w)
+
+	// return render_template('timeline.html', messages=..., followed=..., profile_user=...)
+	tmpl, err := template.ParseFiles("templates/timeline.html")
+	if err != nil {
+		http.Error(w, "Template error", http.StatusInternalServerError)
+		return
+	}
+	tmpl.Execute(w, map[string]interface{}{
+		"messages":     messages,
+		"followed":     followed,
+		"profile_user": profileUser,
+		"user":         r.Context().Value("user"),
+		"flashes":      flashes,
+	})
+}
+
+func followUser(w http.ResponseWriter, r *http.Request) {
+	// if not g.user: abort(401)
+	currentUser := r.Context().Value("user")
+	if currentUser == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized) // abort(401)
+		return
+	}
+	user := currentUser.(User)
+	username := mux.Vars(r)["username"]
+
+	// whom_id = get_user_id(username)
+	var result struct {
+		ID int64 `bson:"user_id"`
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := db.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&result)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound) // if whom_id is None: abort(404)
+		return
+	}
+	whomID := result.ID
+
+	// g.db.execute('insert into follower (who_id, whom_id) values (?, ?)', [session['user_id'], whom_id])
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	db.Collection("follower").InsertOne(ctx, bson.M{
+		"who_id":  user.ID,
+		"whom_id": whomID,
+	})
+	// g.db.commit() - MongoDB auto-commits
+
+	// flash('You are now following "%s"' % username)
+	session, _ := store.Get(r, "minitwit-session")
+	session.AddFlash("You are now following \"" + username + "\"")
+	session.Save(r, w)
+
+	// return redirect(url_for('user_timeline', username=username))
+	http.Redirect(w, r, "/"+username, http.StatusSeeOther)
+}
+
+func unfollowUser(w http.ResponseWriter, r *http.Request) {
+	// if not g.user: abort(401)
+	currentUser := r.Context().Value("user")
+	if currentUser == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized) // abort(401)
+		return
+	}
+	user := currentUser.(User)
+	username := mux.Vars(r)["username"]
+
+	// whom_id = get_user_id(username)
+	var result struct {
+		ID int64 `bson:"user_id"`
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err := db.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&result)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound) // if whom_id is None: abort(404)
+		return
+	}
+	whomID := result.ID
+
+	// g.db.execute('delete from follower where who_id=? and whom_id=?', [session['user_id'], whom_id])
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	db.Collection("follower").DeleteOne(ctx, bson.M{
+		"who_id":  user.ID,
+		"whom_id": whomID,
+	})
+	// g.db.commit() - MongoDB auto-commits
+
+	// flash('You are no longer following "%s"' % username)
+	session, _ := store.Get(r, "minitwit-session")
+	session.AddFlash("You are no longer following \"" + username + "\"")
+	session.Save(r, w)
+
+	// return redirect(url_for('user_timeline', username=username))
+	http.Redirect(w, r, "/"+username, http.StatusSeeOther)
+}
+
+func queryDatabaseForMessages(limit int) ([]TimelineMessage, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := db.Collection("message")
+
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.D{{Key: "flagged", Value: false}}}},
+
+		{{Key: "$sort", Value: bson.D{{Key: "pub_date", Value: -1}}}},
+
+		{{Key: "$limit", Value: limit}},
+
+		{{Key: "$lookup", Value: bson.D{
+			{Key: "from", Value: "user"},
+			{Key: "localField", Value: "author_id"},
+			{Key: "foreignField", Value: "_id"},
+			{Key: "as", Value: "author_info"},
+		}}},
+
+		{{Key: "$unwind", Value: "$author_info"}},
+	}
+
+	cursor, err := collection.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var messages []TimelineMessage
+
+	for cursor.Next(ctx) {
+		var result struct {
+			Text       string `bson:"text"`
+			PubDate    int64  `bson:"pub_date"`
+			Flagged    bool   `bson:"flagged"`
+			AuthorInfo struct {
+				Username string `bson:"username"`
+				Email    string `bson:"email"`
+			} `bson:"author_info"`
+		}
+
+		if err := cursor.Decode(&result); err != nil {
+			return nil, err
+		}
+
+		messages = append(messages, TimelineMessage{
+			Text:     result.Text,
+			PubDate:  int(result.PubDate),
+			Username: result.AuthorInfo.Username,
+			Email:    result.AuthorInfo.Email,
+		})
+	}
+
+	return messages, nil
+}
+
+func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
+	//msgs, err := queryDatabaseForMessages(PER_PAGE)
+	//if err != nil {
+	//	http.Error(w, "Database error: "+err.Error(), 500)
+	//	return
+	//}
+
+	//data := TimelinePage{
+	//	BaseContext: BaseContext{
+	//		User:    getCurrentUser(r),
+	//		Flashes: getFlash(w, r),
+	//	},
+	//	Messages:  msgs,
+	//	PageTitle: "Public Timeline",
+	//	PageID:    "public_timeline",
+	//}
+
+	//funcMap := template.FuncMap{
+	//	"gravatar":       func(email string) string { return gravatarURL(email, 48) },
+	//	"datetimeformat": formatDatetime, // Mapping the function you already wrote
+	//}
+
+	RenderTemplate(w, "layout.html")
+}
+
+func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	userVal := r.Context().Value("user")
+	if userVal == nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	currentUser := userVal.(User)
+
+	text := r.FormValue("text")
+
+	if text != "" {
+		collection := db.Collection("message")
+
+		doc := bson.M{
+			"author_id": currentUser.ID,
+			"text":      text,
+			"pub_date":  time.Now().Unix(),
+			"flagged":   false,
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		_, err := collection.InsertOne(ctx, doc)
+		if err != nil {
+			http.Error(w, "Database error", http.StatusInternalServerError)
+			log.Println("Insert error:", err)
+			return
+		}
+
+		setFlash(w, "Your message was recorded")
+	}
+
+	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+func setFlash(w http.ResponseWriter, message string) {
+	c := &http.Cookie{
+		Name:  "flash",
+		Value: base64.StdEncoding.EncodeToString([]byte(message)),
+		Path:  "/",
+	}
+	http.SetCookie(w, c)
+}
+
+func getFlash(w http.ResponseWriter, r *http.Request) []string {
+	c, err := r.Cookie("flash")
+	if err != nil {
+		return nil // No flash message
+	}
+
+	val, _ := base64.StdEncoding.DecodeString(c.Value)
+
+	http.SetCookie(w, &http.Cookie{
+		Name:    "flash",
+		MaxAge:  -1,
+		Expires: time.Unix(1, 0),
+		Path:    "/",
+	})
+
+	return []string{string(val)}
+}
+
+func getCurrentUser(r *http.Request) *User {
+
+	val := r.Context().Value("user")
+
+	if val == nil {
+		return nil
+	}
+
+	user, ok := val.(User)
+	if !ok {
+		return nil
+	}
+
+	return &user
 }
