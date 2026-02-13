@@ -238,7 +238,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if errMsg != "" {
 		log.Println("Registration error:", errMsg)
 	}
-	RenderTemplate(w, "register.html")
+	RenderTemplate(w, "register.html", nil)
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -280,7 +280,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	RenderTemplate(w, "login.html")
+	RenderTemplate(w, "login.html", nil)
 }
 
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
@@ -359,14 +359,14 @@ func checkPasswordHash(password, hashedPW string) bool {
 	return password == hashedPW
 }
 
-func RenderTemplate(w http.ResponseWriter, html string) {
+func RenderTemplate(w http.ResponseWriter, html string, data interface{}) {
 	parsedTemplate, err := template.ParseFiles("./templates/" + html)
 	if err != nil {
 		log.Printf("Error loading template %s: %v", html, err)
 		http.Error(w, "Template not found", http.StatusInternalServerError)
 		return
 	}
-	err = parsedTemplate.Execute(w, nil)
+	err = parsedTemplate.Execute(w, data)
 	if err != nil {
 		log.Printf("Error executing template %s: %v", html, err)
 		http.Error(w, "Template error", http.StatusInternalServerError)
@@ -596,7 +596,7 @@ func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	//	"datetimeformat": formatDatetime, // Mapping the function you already wrote
 	//}
 
-	RenderTemplate(w, "layout.html")
+	RenderTemplate(w, "layout.html", nil)
 }
 
 func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
