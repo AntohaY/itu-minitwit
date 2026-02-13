@@ -1,19 +1,5 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sign Up | MiniTwit</title>
-  <link rel="stylesheet" type="text/css" href="/static/style.css">
-</head>
-<body>
+{{define "content"}}
   <div class="page">
-    <h1>MiniTwit</h1>
-    <div class="navigation">
-      <a href="/">public timeline</a> |
-      <a href="/register">sign up</a> |
-      <a href="/login">sign in</a>
-    </div>
     <div class="body">
       <h2>Sign Up</h2>
       <form action="/register" method="post">
@@ -30,9 +16,5 @@
         <div class="actions"><input type="submit" value="Sign Up"></div>
       </form>
     </div>
-    <div class="footer">
-      MiniTwit &mdash; A Go Application
-    </div>
   </div>
-</body>
-</html>
+{{end}}
