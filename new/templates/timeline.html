@@ -19,10 +19,10 @@
       This is you!
     {{else if .IsFollowing}}
     You are currently following this user.
-    <a class="unfollow" href="/unfollow/{{.ProfileUser.Username}}">Unfollow user</a>.
+    <a class="unfollow" href="/user/unfollow/{{.ProfileUser.Username}}">Unfollow user</a>.
     {{else}}
     You are not yet following this user.
-      <a class="follow" href="/follow/{{.ProfileUser.Username}}">Follow user</a>.
+      <a class="follow" href="/user/follow/{{.ProfileUser.Username}}">Follow user</a>.
     {{end}}
   </div>
 
@@ -42,11 +42,11 @@
   <ul class="messages">
     {{range .Messages}}
     <li>
-      <img src="{{ .Username | gravatar }}">
+      <img src="{{ .Username | gravatar }}" width="48" height="48" class="gravatar" style="float: left; margin-right: 15px;">
       <p>
         <strong><a href="/user/{{.Username}}">{{.Username}}</a></strong>
         {{.Text}}
-        <small>&mdash; {{.PubDate}}</small>
+        <small>&mdash; {{.PubDate | formatDate}}</small>
       </p>
     </li>
     {{else}}
