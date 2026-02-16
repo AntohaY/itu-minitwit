@@ -8,7 +8,7 @@
 //start a temporary database
 //docker run --name my-test-mongo -p 27017:27017 -d mongo:latest
 
-//check if docker container is runing
+//check if docker container is running
 //docker ps
 //if not, than start it
 //docker start my-test-mongo
@@ -57,11 +57,12 @@ type User struct {
 
 type Message struct {
 	ID        primitive.ObjectID `bson:"_id"`
-	MessageID int64              `bson:"message_id"`
-	AuthorID  int64              `bson:"author_id"`
+	MessageID int                `bson:"message_id"`
+	AuthorID  int                `bson:"author_id"`
 	Text      string             `bson:"text"`
-	PubDate   int64              `bson:"pub_date"`
+	PubDate   int                `bson:"pub_date"`
 	Flagged   int                `bson:"flagged"`
+	Username  string             `bson:"username"`
 }
 
 type BaseContext struct {
@@ -69,30 +70,14 @@ type BaseContext struct {
 	Flashes []string // Replaces get_flashed_messages()
 }
 
-type TimelinePage struct {
-	BaseContext // Embeds User and Flashes automatically
-	Messages    []TimelineMessage
-	ProfileUser *User
-	PageTitle   string // Needed for {{ .PageTitle }}
-	PageID      string // Needed for "active" tab logic (public vs user)
-}
-type TimelineMessage struct {
-	MessageID int
-	AuthorID  int
-	Text      string
-	PubDate   int // or time.Time
-	Flagged   bool
-	Username  string // From the joined User table
-	Email     string // From the joined User table
-
-}
-type TimelineData struct {
-	PageTitle   string // Replaces self.title() logic
-	PageID      string // Replaces request.endpoint logic ("public", "user", "personal")
-	Messages    []TimelineMessage
-	ProfileUser *User // Can be nil if not on a user profile
-	CurrentUser *User // Represents g.user
-	IsFollowing bool  // Replaces 'followed' boolean
+type TimelineUserData struct {
+	PageTitle   string
+	PageID      string // "public", "timeline", or "user"
+	Messages    []Message
+	ProfileUser *User // The user whose profile we are viewing (can be nil)
+	CurrentUser *User // The user currently logged in (can be nil)
+	IsFollowing bool
+	Flashes     []string
 }
 
 // global variables
@@ -102,6 +87,15 @@ var db *mongo.Database // Specific handle to the "test" database
 var store = sessions.NewCookieStore([]byte("development key"))
 
 const PER_PAGE = 30 // Same as Python version
+
+var funcMap = template.FuncMap{
+	"gravatar": func(email string) string {
+		return gravatarURL(email)
+	},
+	"formatDate": func(timestamp int) string {
+		return time.Unix(int64(timestamp), 0).Format("2006-01-02 15:04")
+	},
+}
 
 func main() {
 	// Load Configuration
@@ -126,12 +120,13 @@ func main() {
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 
 	router.HandleFunc("/", PublicTimelineHandler).Methods("GET")
+	router.HandleFunc("/timeline", PersonalTimelineHandler).Methods("GET")
 	router.HandleFunc("/register", RegisterHandler)
 	router.HandleFunc("/login", LoginHandler)
 	router.HandleFunc("/logout", LogoutHandler)
-	router.HandleFunc("/{username}", userTimeline).Methods("GET")
-	router.HandleFunc("/{username}/follow", followUser).Methods("GET")
-	router.HandleFunc("/{username}/unfollow", unfollowUser).Methods("GET")
+	router.HandleFunc("/user/{username}", UserTimelineHandler).Methods("GET")
+	router.HandleFunc("/user/{username}/follow", followUser).Methods("GET")
+	router.HandleFunc("/user/{username}/unfollow", unfollowUser).Methods("GET")
 	router.HandleFunc("/add_message", AddMessageHandler).Methods("POST")
 	log.Fatal(http.ListenAndServe(":5000", AuthMiddleware(router)))
 }
@@ -160,16 +155,16 @@ func formatDatetime(timestamp int64) string {
 	return t.Format("2006-01-02 @ 15:04")
 }
 
-func gravatarURL(email string, size int) string {
+func gravatarURL(email string) string {
 	cleanEmail := strings.ToLower(strings.TrimSpace(email))
 	//we create hash because thats how website request data
 	hash := md5.Sum([]byte(cleanEmail))
 	//Convert the hash (binary) into a Hex String (text)
 	hashString := hex.EncodeToString(hash[:])
-	return fmt.Sprintf("http://www.gravatar.com/avatar/%s?d=identicon&s=%d", hashString, size)
+	return fmt.Sprintf("http://www.gravatar.com/avatar/%s?d=identicon&s=%d", hashString, 80)
 }
 
-// AuthMiddleware veryfie user
+// AuthMiddleware verify user
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //its anonymus function
 		session, _ := store.Get(r, "minitwit-session") //Get the Session (Cookie)
@@ -359,80 +354,109 @@ func checkPasswordHash(password, hashedPW string) bool {
 	return password == hashedPW
 }
 
-func RenderTemplate(w http.ResponseWriter, html string, data interface{}) {
-	parsedTemplate, err := template.ParseFiles("./templates/" + html)
+func RenderTemplate(w http.ResponseWriter, tmplName string, data interface{}) {
+	// 1. Attach Funcs BEFORE parsing
+	t := template.New("base").Funcs(funcMap)
+
+	// 2. Parse Layout + Page
+	t, err := t.ParseFiles("templates/layout.html", "templates/"+tmplName)
 	if err != nil {
-		log.Printf("Error loading template %s: %v", html, err)
-		http.Error(w, "Template not found", http.StatusInternalServerError)
+		log.Println("Parse Error:", err)
+		http.Error(w, "Internal Error", 500)
 		return
 	}
-	err = parsedTemplate.Execute(w, data)
+
+	// 3. Execute "base"
+	err = t.ExecuteTemplate(w, "base", data)
 	if err != nil {
-		log.Printf("Error executing template %s: %v", html, err)
-		http.Error(w, "Template error", http.StatusInternalServerError)
+		log.Println("Exec Error:", err)
+		http.Error(w, "Internal Error", 500)
 	}
 }
 
-func userTimeline(w http.ResponseWriter, r *http.Request) {
-	username := mux.Vars(r)["username"]
+func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	username := vars["username"]
 
-	// Query: select * from user where username = ? (one=True)
-	var profileUser User
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	// 1. Find the Profile User
+	var profileUser User
 	err := db.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&profileUser)
 	if err != nil {
-		http.Error(w, "User not found", http.StatusNotFound) // abort(404)
+		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 
-	// followed = False
+	// 2. Get Current User (if any)
+	var currUser *User
+	if u := r.Context().Value("user"); u != nil {
+		val := u.(User)
+		currUser = &val
+	}
+
+	// 3. Check "Following" status
 	followed := false
-	// if g.user:
-	if currentUser := r.Context().Value("user"); currentUser != nil {
-		user := currentUser.(User)
-		// Query: select 1 from follower where who_id = ? and whom_id = ? (one=True)
+	if currUser != nil {
 		var result struct{}
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
 		err := db.Collection("follower").FindOne(ctx, bson.M{
-			"who_id":  user.ID,
+			"who_id":  currUser.ID,
 			"whom_id": profileUser.ID,
 		}).Decode(&result)
-		followed = (err == nil) // is not None
+		if err == nil {
+			followed = true
+		}
 	}
 
-	// Query: select message.*, user.* from message, user where
-	//        user.user_id = message.author_id and user.user_id = ?
-	//        order by message.pub_date desc limit ?
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	// 4. Get Messages & Fill Missing Data
 	opts := options.Find().SetSort(bson.M{"pub_date": -1}).SetLimit(PER_PAGE)
-	cursor, _ := db.Collection("message").Find(ctx, bson.M{
+
+	cursor, err := db.Collection("message").Find(ctx, bson.M{
 		"author_id": profileUser.ID,
-		"flagged":   0,
+		"flagged":   false,
 	}, opts)
+
 	var messages []Message
-	cursor.All(ctx, &messages)
 
-	// Retrieve flash messages from session
-	session, _ := store.Get(r, "minitwit-session")
-	flashes := session.Flashes()
-	session.Save(r, w)
+	if err == nil {
+		// A. Define a temporary struct that matches MongoDB types EXACTLY
+		var rawResults []struct {
+			Text     string             `bson:"text"`
+			PubDate  int64              `bson:"pub_date"`  // DB uses int64
+			AuthorID primitive.ObjectID `bson:"author_id"` // DB uses ObjectID
+			Flagged  bool               `bson:"flagged"`   // DB uses bool
+		}
 
-	// return render_template('timeline.html', messages=..., followed=..., profile_user=...)
-	tmpl, err := template.ParseFiles("templates/timeline.html")
-	if err != nil {
-		http.Error(w, "Template error", http.StatusInternalServerError)
-		return
+		// B. Decode into this safe struct first
+		// If this fails, we will now see the error!
+		if err := cursor.All(ctx, &rawResults); err != nil {
+			fmt.Println("Decoding error:", err) // Check your terminal if empty!
+		}
+
+		// C. Manually map to your view struct (just like PublicTimeline)
+		for _, raw := range rawResults {
+			msg := Message{
+				Text:     raw.Text,
+				PubDate:  int(raw.PubDate), // Convert int64 -> int
+				Username: profileUser.Username,
+				//Email:    profileUser.Email,
+			}
+			messages = append(messages, msg)
+		}
 	}
-	tmpl.Execute(w, map[string]interface{}{
-		"messages":     messages,
-		"followed":     followed,
-		"profile_user": profileUser,
-		"user":         r.Context().Value("user"),
-		"flashes":      flashes,
-	})
+	// 5. Render
+	data := TimelineUserData{
+		PageTitle:   profileUser.Username + "'s Timeline",
+		PageID:      "user",
+		Messages:    messages,
+		ProfileUser: &profileUser,
+		CurrentUser: currUser,
+		IsFollowing: followed,
+		Flashes:     getFlash(w, r),
+	}
+
+	RenderTemplate(w, "timeline.html", data)
 }
 
 func followUser(w http.ResponseWriter, r *http.Request) {
@@ -517,7 +541,7 @@ func unfollowUser(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/"+username, http.StatusSeeOther)
 }
 
-func queryDatabaseForMessages(limit int) ([]TimelineMessage, error) {
+func queryDatabaseForMessages(limit int) ([]Message, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -546,7 +570,7 @@ func queryDatabaseForMessages(limit int) ([]TimelineMessage, error) {
 	}
 	defer cursor.Close(ctx)
 
-	var messages []TimelineMessage
+	var messages []Message
 
 	for cursor.Next(ctx) {
 		var result struct {
@@ -563,40 +587,162 @@ func queryDatabaseForMessages(limit int) ([]TimelineMessage, error) {
 			return nil, err
 		}
 
-		messages = append(messages, TimelineMessage{
+		messages = append(messages, Message{
 			Text:     result.Text,
 			PubDate:  int(result.PubDate),
 			Username: result.AuthorInfo.Username,
-			Email:    result.AuthorInfo.Email,
 		})
 	}
 
 	return messages, nil
 }
 
+func getFollowedMessages(userID primitive.ObjectID, limit int) ([]Message, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// 1. Get the list of people I follow
+	// We query the "follower" collection where who_id == my userID
+	followerColl := db.Collection("follower")
+	cursor, err := followerColl.Find(ctx, bson.M{"who_id": userID})
+	if err != nil {
+		return nil, err
+	}
+
+	// We need a slice of ObjectIDs to pass to the $in query
+	// Start with the user's OWN ID (so they see their own posts)
+	followedIDs := []primitive.ObjectID{userID}
+
+	for cursor.Next(ctx) {
+		var rel struct {
+			WhomID primitive.ObjectID `bson:"whom_id"`
+		}
+		if err := cursor.Decode(&rel); err == nil {
+			followedIDs = append(followedIDs, rel.WhomID)
+		}
+	}
+	cursor.Close(ctx)
+
+	// 2. Query Messages with Aggregation
+	// Now we match messages where author_id is IN our list
+	messageColl := db.Collection("message")
+
+	pipeline := mongo.Pipeline{
+		// MATCH: Flagged is false AND author_id is in our list
+		{{Key: "$match", Value: bson.D{
+			{Key: "flagged", Value: false},
+			{Key: "author_id", Value: bson.D{{Key: "$in", Value: followedIDs}}},
+		}}},
+
+		// SORT: Newest first
+		{{Key: "$sort", Value: bson.D{{Key: "pub_date", Value: -1}}}},
+
+		// LIMIT
+		{{Key: "$limit", Value: limit}},
+
+		// LOOKUP: Join with 'user' table to get Username/Email
+		{{Key: "$lookup", Value: bson.D{
+			{Key: "from", Value: "user"},
+			{Key: "localField", Value: "author_id"},
+			{Key: "foreignField", Value: "_id"},
+			{Key: "as", Value: "author_info"},
+		}}},
+
+		// UNWIND: Flatten the author_info array
+		{{Key: "$unwind", Value: "$author_info"}},
+	}
+
+	// 3. Execute and Decode
+	cursor, err = messageColl.Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var messages []Message
+	for cursor.Next(ctx) {
+		// We decode into a temporary struct to handle the nested AuthorInfo
+		var result struct {
+			Text       string `bson:"text"`
+			PubDate    int64  `bson:"pub_date"`
+			AuthorInfo struct {
+				Username string `bson:"username"`
+				Email    string `bson:"email"`
+			} `bson:"author_info"`
+		}
+
+		if err := cursor.Decode(&result); err != nil {
+			continue
+		}
+
+		// Map to your main Message struct
+		messages = append(messages, Message{
+			Text:     result.Text,
+			PubDate:  int(result.PubDate),
+			Username: result.AuthorInfo.Username,
+			//Email:    result.AuthorInfo.Email, // Ensure your Message struct has this field
+		})
+	}
+
+	return messages, nil
+}
+
+func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
+	// 1. Get Current User (Security check)
+	var currUser *User
+	if u := r.Context().Value("user"); u != nil {
+		val := u.(User)
+		currUser = &val
+	}
+
+	if currUser == nil {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	// 2. Logic: Get messages from user AND people they follow
+	// (You likely have a DB function for this, e.g., getFollowedMessages)
+	msgs, _ := getFollowedMessages(currUser.ID, PER_PAGE)
+
+	// 3. Render
+	data := TimelineUserData{
+		PageTitle:   "My Timeline",
+		PageID:      "personal", // <--- CRITICAL: Triggers the Input Box in HTML
+		Messages:    msgs,
+		CurrentUser: currUser,
+		ProfileUser: currUser,
+	}
+
+	RenderTemplate(w, "timeline.html", data)
+}
+
 func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
-	//msgs, err := queryDatabaseForMessages(PER_PAGE)
-	//if err != nil {
-	//	http.Error(w, "Database error: "+err.Error(), 500)
-	//	return
-	//}
+	// 1. Get Messages
+	// (Assuming queryDatabaseForMessages returns []Message)
+	msgs, err := queryDatabaseForMessages(PER_PAGE)
+	if err != nil {
+		http.Error(w, "Database error: "+err.Error(), 500)
+		return
+	}
 
-	//data := TimelinePage{
-	//	BaseContext: BaseContext{
-	//		User:    getCurrentUser(r),
-	//		Flashes: getFlash(w, r),
-	//	},
-	//	Messages:  msgs,
-	//	PageTitle: "Public Timeline",
-	//	PageID:    "public_timeline",
-	//}
+	// 2. Get Current User (if logged in)
+	var currUser *User
+	if u := r.Context().Value("user"); u != nil {
+		val := u.(User) // Cast interface{} to User struct
+		currUser = &val
+	}
 
-	//funcMap := template.FuncMap{
-	//	"gravatar":       func(email string) string { return gravatarURL(email, 48) },
-	//	"datetimeformat": formatDatetime, // Mapping the function you already wrote
-	//}
+	// 3. Setup Data
+	data := TimelineUserData{
+		PageTitle:   "Public Timeline",
+		PageID:      "public", // Matches {{if eq .PageID "public"}} in template
+		Messages:    msgs,
+		CurrentUser: currUser,
+		ProfileUser: nil,            // Not viewing a specific profile
+		Flashes:     getFlash(w, r), // Your flash helper
+	}
 
-	RenderTemplate(w, "layout.html", nil)
+	RenderTemplate(w, "timeline.html", data)
 }
 
 func AddMessageHandler(w http.ResponseWriter, r *http.Request) {

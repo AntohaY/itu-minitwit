@@ -1,28 +1,56 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Timeline | MiniTwit</title>
-  <link rel="stylesheet" type="text/css" href="/static/style.css">
-</head>
-<body>
-  <div class="page">
-    <h1>MiniTwit</h1>
-    <div class="navigation">
-      <a href="/">my timeline</a> |
-      <a href="/">public timeline</a> |
-      <a href="/logout">sign out</a>
-    </div>
-    <div class="body">
-      <h2>My Timeline</h2>
-      <ul class="messages">
-        <li><em>There's no message so far.</em></li>
-      </ul>
-    </div>
-    <div class="footer">
-      MiniTwit &mdash; A Go Application
-    </div>
+{{define "title"}}
+  {{if eq .PageID "public"}}
+    Public Timeline
+  {{else if eq .PageID "user"}}
+  {{.ProfileUser.Username}}'s Timeline
+  {{else}}
+  My Timeline
+  {{end}}
+  {{end}}
+
+  {{define "content"}}
+  <h2>{{template "title" .}}</h2>
+
+  {{if .CurrentUser}}
+
+  {{if eq .PageID "user"}}
+  <div class="followstatus">
+    {{if eq .CurrentUser.ID .ProfileUser.ID}}
+      This is you!
+    {{else if .IsFollowing}}
+    You are currently following this user.
+    <a class="unfollow" href="/unfollow/{{.ProfileUser.Username}}">Unfollow user</a>.
+    {{else}}
+    You are not yet following this user.
+      <a class="follow" href="/follow/{{.ProfileUser.Username}}">Follow user</a>.
+    {{end}}
   </div>
-</body>
-</html>
+
+  {{else if eq .PageID "personal"}}
+    <div class="twitbox">
+      <h3>What's on your mind {{.CurrentUser.Username}}?</h3>
+      <form action="/add_message" method="post">
+        <p>
+          <input type="text" name="text" size="60">
+          <input type="submit" value="Share">
+        </p>
+      </form>
+    </div>
+  {{end}}
+
+  {{end}}
+  <ul class="messages">
+    {{range .Messages}}
+    <li>
+      <img src="{{ .Username | gravatar }}">
+      <p>
+        <strong><a href="/user/{{.Username}}">{{.Username}}</a></strong>
+        {{.Text}}
+        <small>&mdash; {{.PubDate}}</small>
+      </p>
+    </li>
+    {{else}}
+    <li><em>There's no message so far.</em></li>
+    {{end}}
+  </ul>
+{{end}}

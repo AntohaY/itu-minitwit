@@ -1,0 +1,19 @@
+# docker/web/Dockerfile.dev
+FROM golang:1.23
+
+WORKDIR /app
+
+# 1. Install Air by downloading the binary directly (More reliable than go install)
+#    We use curl to grab the install script and pipe it to sh
+RUN curl -sSfL https://raw.githubusercontent.com/air-verse/air/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+
+# 2. Cache dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+# 3. Copy the config for Air (optional)
+#    Note: Make sure .air.toml exists in your "new" folder, or remove this line
+COPY .air.toml ./
+
+# 4. Run Air
+CMD ["air", "-c", ".air.toml"]
