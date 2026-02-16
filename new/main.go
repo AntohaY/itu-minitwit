@@ -16,8 +16,8 @@
 //download valid dependencies
 //go mod tidy
 
-//check if it works
-//go run main.go
+// check if it works
+// go run main.go
 package main
 
 import (
@@ -93,7 +93,7 @@ var funcMap = template.FuncMap{
 		return gravatarURL(email)
 	},
 	"formatDate": func(timestamp int) string {
-		return time.Unix(int64(timestamp), 0).Format("2006-01-02 15:04")
+		return formatDatetime(int64(timestamp))
 	},
 }
 
@@ -124,9 +124,9 @@ func main() {
 	router.HandleFunc("/register", RegisterHandler)
 	router.HandleFunc("/login", LoginHandler)
 	router.HandleFunc("/logout", LogoutHandler)
+	router.HandleFunc("/user/follow/{username}", followUser).Methods("GET")
+	router.HandleFunc("/user/unfollow/{username}", unfollowUser).Methods("GET")
 	router.HandleFunc("/user/{username}", UserTimelineHandler).Methods("GET")
-	router.HandleFunc("/user/{username}/follow", followUser).Methods("GET")
-	router.HandleFunc("/user/{username}/unfollow", unfollowUser).Methods("GET")
 	router.HandleFunc("/add_message", AddMessageHandler).Methods("POST")
 	log.Fatal(http.ListenAndServe(":5000", AuthMiddleware(router)))
 }
@@ -151,7 +151,8 @@ func getUserID(username string) primitive.ObjectID {
 
 // time stemp means how many seconds passed since january 1st,1970
 func formatDatetime(timestamp int64) string {
-	t := time.Unix(timestamp, 0).UTC() //(0 means zero nanoseconds)
+	timezone, _ := time.LoadLocation("Europe/Warsaw")
+	t := time.Unix(timestamp, 0).In(timezone) //(0 means zero nanoseconds)
 	return t.Format("2006-01-02 @ 15:04")
 }
 
@@ -189,12 +190,15 @@ func AuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// RegisterHandler manages user sign-ups by validating form data and saving new users to the DB.
+// It prevents logged-in users from re-registering and handles error reporting via the UI.
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	user := r.Context().Value("user")
 	if user != nil {
+		setFlash(w, "You are already logged in as "+user.(User).Username)
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
@@ -230,10 +234,16 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	data := TimelineUserData{
+		PageTitle: "Register",
+		Flashes:   []string{},
+	}
+
 	if errMsg != "" {
 		log.Println("Registration error:", errMsg)
+		data.Flashes = append(data.Flashes, errMsg)
 	}
-	RenderTemplate(w, "register.html", nil)
+	RenderTemplate(w, "register.html", data)
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -468,20 +478,19 @@ func followUser(w http.ResponseWriter, r *http.Request) {
 	}
 	user := currentUser.(User)
 	username := mux.Vars(r)["username"]
+	log.Println("we reded username: " + username)
 
 	// whom_id = get_user_id(username)
-	var result struct {
-		ID int64 `bson:"user_id"`
-	}
+	var profileUser User
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	err := db.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&result)
+
+	err := db.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&profileUser)
 	if err != nil {
-		http.Error(w, "User not found", http.StatusNotFound) // if whom_id is None: abort(404)
+		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
-	whomID := result.ID
-
+	whomID := profileUser.ID
 	// g.db.execute('insert into follower (who_id, whom_id) values (?, ?)', [session['user_id'], whom_id])
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -497,7 +506,8 @@ func followUser(w http.ResponseWriter, r *http.Request) {
 	session.Save(r, w)
 
 	// return redirect(url_for('user_timeline', username=username))
-	http.Redirect(w, r, "/"+username, http.StatusSeeOther)
+	//log.Println("DEBUG: Redirecting user to /user/" + username)
+	http.Redirect(w, r, "/user/"+username, http.StatusSeeOther)
 }
 
 func unfollowUser(w http.ResponseWriter, r *http.Request) {
@@ -511,17 +521,16 @@ func unfollowUser(w http.ResponseWriter, r *http.Request) {
 	username := mux.Vars(r)["username"]
 
 	// whom_id = get_user_id(username)
-	var result struct {
-		ID int64 `bson:"user_id"`
-	}
+	var profileUser User
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	err := db.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&result)
+
+	err := db.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&profileUser)
 	if err != nil {
-		http.Error(w, "User not found", http.StatusNotFound) // if whom_id is None: abort(404)
+		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
-	whomID := result.ID
+	whomID := profileUser.ID
 
 	// g.db.execute('delete from follower where who_id=? and whom_id=?', [session['user_id'], whom_id])
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
@@ -538,7 +547,7 @@ func unfollowUser(w http.ResponseWriter, r *http.Request) {
 	session.Save(r, w)
 
 	// return redirect(url_for('user_timeline', username=username))
-	http.Redirect(w, r, "/"+username, http.StatusSeeOther)
+	http.Redirect(w, r, "/user/"+username, http.StatusSeeOther)
 }
 
 func queryDatabaseForMessages(limit int) ([]Message, error) {
