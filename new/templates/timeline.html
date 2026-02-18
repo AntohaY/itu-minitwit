@@ -1,56 +1,48 @@
-{{define "title"}}
-  {{if eq .PageID "public"}}
-    Public Timeline
-  {{else if eq .PageID "user"}}
-  {{.ProfileUser.Username}}'s Timeline
+{{define "title"}} {{if eq .PageID "public"}} Public Timeline {{else if eq
+.PageID "user"}} {{.ProfileUser.Username}}'s Timeline {{else}} My Timeline
+{{end}} {{end}} {{define "content"}}
+<h2>{{template "title" .}}</h2>
+
+{{if .CurrentUser}} {{if eq .PageID "user"}}
+<div class="followstatus">
+  {{if eq .CurrentUser.ID .ProfileUser.ID}} This is you! {{else if
+  .IsFollowing}} You are currently following this user.
+  <a class="unfollow" href="/user/unfollow/{{.ProfileUser.Username}}"
+    >Unfollow user</a
+  >. {{else}} You are not yet following this user.
+  <a class="follow" href="/user/follow/{{.ProfileUser.Username}}">Follow user</a
+  >. {{end}}
+</div>
+
+{{else if eq .PageID "personal"}}
+<div class="twitbox">
+  <h3>What's on your mind {{.CurrentUser.Username}}?</h3>
+  <form action="/add_message" method="post">
+    <p>
+      <input type="text" name="text" size="60" />
+      <input type="submit" value="Share" />
+    </p>
+  </form>
+</div>
+{{end}} {{end}}
+<ul class="messages">
+  {{range .Messages}}
+  <li>
+    <img
+      src="{{ .Username | gravatar }}"
+      width="48"
+      height="48"
+      class="gravatar"
+      style="float: left; margin-right: 15px"
+    />
+    <p>
+      <strong><a href="/user/{{.Username}}">{{.Username}}</a></strong>
+      {{.Text}}
+      <small>&mdash; {{.PubDate | formatDate}}</small>
+    </p>
+  </li>
   {{else}}
-  My Timeline
+  <li><em>There's no message so far.</em></li>
   {{end}}
-  {{end}}
-
-  {{define "content"}}
-  <h2>{{template "title" .}}</h2>
-
-  {{if .CurrentUser}}
-
-  {{if eq .PageID "user"}}
-  <div class="followstatus">
-    {{if eq .CurrentUser.ID .ProfileUser.ID}}
-      This is you!
-    {{else if .IsFollowing}}
-    You are currently following this user.
-    <a class="unfollow" href="/user/unfollow/{{.ProfileUser.Username}}">Unfollow user</a>.
-    {{else}}
-    You are not yet following this user.
-      <a class="follow" href="/user/follow/{{.ProfileUser.Username}}">Follow user</a>.
-    {{end}}
-  </div>
-
-  {{else if eq .PageID "personal"}}
-    <div class="twitbox">
-      <h3>What's on your mind {{.CurrentUser.Username}}?</h3>
-      <form action="/add_message" method="post">
-        <p>
-          <input type="text" name="text" size="60">
-          <input type="submit" value="Share">
-        </p>
-      </form>
-    </div>
-  {{end}}
-
-  {{end}}
-  <ul class="messages">
-    {{range .Messages}}
-    <li>
-      <img src="{{ .Username | gravatar }}" width="48" height="48" class="gravatar" style="float: left; margin-right: 15px;">
-      <p>
-        <strong><a href="/user/{{.Username}}">{{.Username}}</a></strong>
-        {{.Text}}
-        <small>&mdash; {{.PubDate | formatDate}}</small>
-      </p>
-    </li>
-    {{else}}
-    <li><em>There's no message so far.</em></li>
-    {{end}}
-  </ul>
+</ul>
 {{end}}

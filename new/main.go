@@ -23,7 +23,6 @@ package main
 import (
 	"context"
 	"crypto/md5"
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"           // replace print() in python
 	"html/template" // for rendering HTML templates
@@ -39,52 +38,18 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
+	. "minitwit/db_setup"
+	. "minitwit/helpers/flashes"
+	. "minitwit/middleware"
+	. "minitwit/types"
 )
-
-type Configuration struct {
-	Debug     bool
-	SecretKey string
-	MongoURI  string
-}
-
-type User struct {
-	ID       primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	Username string             `json:"username" bson:"username"`
-	Email    string             `json:"email" bson:"email"`
-	PW       string             `json:"pw" bson:"pw"`
-	HashedPW string             `json:"hashedpw" bson:"hashedpw"`
-}
-
-type Message struct {
-	ID        primitive.ObjectID `bson:"_id"`
-	MessageID int                `bson:"message_id"`
-	AuthorID  int                `bson:"author_id"`
-	Text      string             `bson:"text"`
-	PubDate   int                `bson:"pub_date"`
-	Flagged   int                `bson:"flagged"`
-	Username  string             `bson:"username"`
-}
-
-type BaseContext struct {
-	User    *User    // Wraps the current user (replaces g.user)
-	Flashes []string // Replaces get_flashed_messages()
-}
-
-type TimelineUserData struct {
-	PageTitle   string
-	PageID      string // "public", "timeline", or "user"
-	Messages    []Message
-	ProfileUser *User // The user whose profile we are viewing (can be nil)
-	CurrentUser *User // The user currently logged in (can be nil)
-	IsFollowing bool
-	Flashes     []string
-}
 
 // global variables
 var config Configuration
 var dbClient *mongo.Client
 var db *mongo.Database // Specific handle to the "test" database
-var store = sessions.NewCookieStore([]byte("development key"))
+var store = sessions.NewCookieStore([]byte("development key"))	
 
 const PER_PAGE = 30 // Same as Python version
 
@@ -110,12 +75,12 @@ func main() {
 		config.SecretKey = envKey
 	}
 
-	ResolveClientDB()
+	dbClient, db = ResolveClientDB(config)
 
 	router := mux.NewRouter()
-	router.Use(beforeAfterMiddleware)
-	router.Use(AuthMiddleware)
-
+	authMiddleware := AuthMiddleware(store, db)
+	router.Use(BeforeAfterMiddleware)
+	router.Use(authMiddleware)
 	// Serve static files
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 
@@ -128,7 +93,7 @@ func main() {
 	router.HandleFunc("/user/unfollow/{username}", unfollowUser).Methods("GET")
 	router.HandleFunc("/user/{username}", UserTimelineHandler).Methods("GET")
 	router.HandleFunc("/add_message", AddMessageHandler).Methods("POST")
-	log.Fatal(http.ListenAndServe(":5000", AuthMiddleware(router)))
+	log.Fatal(http.ListenAndServe(":5000", router))
 }
 
 func getUserID(username string) primitive.ObjectID {
@@ -165,30 +130,30 @@ func gravatarURL(email string) string {
 	return fmt.Sprintf("http://www.gravatar.com/avatar/%s?d=identicon&s=%d", hashString, 80)
 }
 
-// AuthMiddleware verify user
-func AuthMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //its anonymus function
-		session, _ := store.Get(r, "minitwit-session") //Get the Session (Cookie)
+// // AuthMiddleware verify user
+// func AuthMiddleware(next http.Handler) http.Handler {
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { //its anonymus function
+// 		session, _ := store.Get(r, "minitwit-session") //Get the Session (Cookie)
 
-		// 2. Check if "user_id" exists in the session
-		if userIDStr, ok := session.Values["user_id"].(string); ok {
-			fmt.Println("User ID found in session:", userIDStr)
-			// 3. Find the User in DB
-			var currentUser User
-			objID, _ := primitive.ObjectIDFromHex(userIDStr)
+// 		// 2. Check if "user_id" exists in the session
+// 		if userIDStr, ok := session.Values["user_id"].(string); ok {
+// 			fmt.Println("User ID found in session:", userIDStr)
+// 			// 3. Find the User in DB
+// 			var currentUser User
+// 			objID, _ := primitive.ObjectIDFromHex(userIDStr)
 
-			err := db.Collection("user").FindOne(context.TODO(), bson.M{"_id": objID}).Decode(&currentUser)
+// 			err := db.Collection("user").FindOne(context.TODO(), bson.M{"_id": objID}).Decode(&currentUser)
 
-			if err == nil {
-				ctx := context.WithValue(r.Context(), "user", currentUser) // we create updated context
-				r = r.WithContext(ctx)                                     // update the request with the new context
-			}
-		}
+// 			if err == nil {
+// 				ctx := context.WithValue(r.Context(), "user", currentUser) // we create updated context
+// 				r = r.WithContext(ctx)                                     // update the request with the new context
+// 			}
+// 		}
 
-		// 5. Pass the request to the next handler
-		next.ServeHTTP(w, r)
-	})
-}
+// 		// 5. Pass the request to the next handler
+// 		next.ServeHTTP(w, r)
+// 	})
+// }
 
 // RegisterHandler manages user sign-ups by validating form data and saving new users to the DB.
 // It prevents logged-in users from re-registering and handles error reporting via the UI.
@@ -198,7 +163,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 	user := r.Context().Value("user")
 	if user != nil {
-		setFlash(w, "You are already logged in as "+user.(User).Username)
+		SetFlash(w, "You are already logged in as "+user.(User).Username)
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
@@ -298,66 +263,19 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
-func beforeAfterMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("Executing before request logic")
-		ctx := context.WithValue(r.Context(), "user", nil)
-		r = r.WithContext(ctx)
 
-		// Call the next handler in the chain
-		next.ServeHTTP(w, r)
+// func beforeAfterMiddleware(next http.Handler) http.Handler {
+// 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// 		fmt.Println("Executing before request logic")
+// 		ctx := context.WithValue(r.Context(), "user", nil)
+// 		r = r.WithContext(ctx)
 
-		fmt.Println("Executing after request logic")
-	})
-}
+// 		// Call the next handler in the chain
+// 		next.ServeHTTP(w, r)
 
-func ResolveClientDB() *mongo.Client {
-	// Setup Database URI (Replaces db_ip = os.getenv / app.config["MONGO_URI"])
-	dbIP := os.Getenv("DB_IP")
-	if dbIP == "" {
-		dbIP = "localhost" // Fallback if running outside Docker
-	}
-	config.MongoURI = fmt.Sprintf("mongodb://%s:27017", dbIP)
-
-	// Connect to MongoDB (Replaces mongo = PyMongo(app))
-	fmt.Println("Connecting to:", config.MongoURI)
-
-	// Create a context with a 10-second timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	// Connect
-	clientOptions := options.Client().ApplyURI(config.MongoURI)
-	var err error
-	dbClient, err = mongo.Connect(ctx, clientOptions)
-	if err != nil {
-		log.Fatal("Connection failed:", err)
-	}
-
-	// Ping to verify
-	err = dbClient.Ping(ctx, nil)
-	if err != nil {
-		log.Fatal("Could not ping MongoDB:", err)
-	}
-
-	db = dbClient.Database("test")
-	fmt.Println("Successfully connected to MongoDB!")
-	fmt.Printf("Loaded Config: Debug=%v, SecretKey=%s\n", config.Debug, config.SecretKey)
-	return dbClient
-}
-
-func CloseClientDB() {
-	if dbClient == nil {
-		return
-	}
-
-	err := dbClient.Disconnect(context.TODO())
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("Connection to MongoDB closed.")
-}
+// 		fmt.Println("Executing after request logic")
+// 	})
+// }
 
 func checkPasswordHash(password, hashedPW string) bool {
 	// TODO: implement proper password hashing comparison
@@ -463,7 +381,7 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		ProfileUser: &profileUser,
 		CurrentUser: currUser,
 		IsFollowing: followed,
-		Flashes:     getFlash(w, r),
+		Flashes:     GetFlash(w, r),
 	}
 
 	RenderTemplate(w, "timeline.html", data)
@@ -748,7 +666,7 @@ func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		Messages:    msgs,
 		CurrentUser: currUser,
 		ProfileUser: nil,            // Not viewing a specific profile
-		Flashes:     getFlash(w, r), // Your flash helper
+		Flashes:     GetFlash(w, r), // Your flash helper
 	}
 
 	RenderTemplate(w, "timeline.html", data)
@@ -789,37 +707,10 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		setFlash(w, "Your message was recorded")
+		SetFlash(w, "Your message was recorded")
 	}
 
 	http.Redirect(w, r, "/", http.StatusFound)
-}
-
-func setFlash(w http.ResponseWriter, message string) {
-	c := &http.Cookie{
-		Name:  "flash",
-		Value: base64.StdEncoding.EncodeToString([]byte(message)),
-		Path:  "/",
-	}
-	http.SetCookie(w, c)
-}
-
-func getFlash(w http.ResponseWriter, r *http.Request) []string {
-	c, err := r.Cookie("flash")
-	if err != nil {
-		return nil // No flash message
-	}
-
-	val, _ := base64.StdEncoding.DecodeString(c.Value)
-
-	http.SetCookie(w, &http.Cookie{
-		Name:    "flash",
-		MaxAge:  -1,
-		Expires: time.Unix(1, 0),
-		Path:    "/",
-	})
-
-	return []string{string(val)}
 }
 
 func getCurrentUser(r *http.Request) *User {
