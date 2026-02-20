@@ -56,7 +56,11 @@ func (a *APIHandler) AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		a.updateLatest(r)
 
-		if r.Header.Get("Authorization") != "Basic c2ltdWxhdG9yOnN1cGVyX3NhZmUh" {
+		// Built-in Go helper to extract credentials
+		user, pass, ok := r.BasicAuth()
+
+		// Check if the credentials match "simulator" and "super_safe!"
+		if !ok || user != "simulator" || pass != "super_safe!" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusForbidden)
 			json.NewEncoder(w).Encode(map[string]interface{}{
