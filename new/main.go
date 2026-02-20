@@ -28,8 +28,9 @@ import (
 	"fmt"           // replace print() in python
 	"html/template" // for rendering HTML templates
 	"log"           // for error reporting
-	"net/http"      // built-in library which replace flask
-	"os"            // read environment variables (for example DB_IP)
+	"minitwit/api"
+	"net/http" // built-in library which replace flask
+	"os"       // read environment variables (for example DB_IP)
 	"strings"
 	"time"
 
@@ -98,37 +99,60 @@ var funcMap = template.FuncMap{
 }
 
 func main() {
-	// Load Configuration
+	// 1. Load Configuration & Connect to DB
 	config = Configuration{
-		Debug:     true,              // Default: DEBUG=True
-		SecretKey: "development key", // Default: SECRET_KEY='development key'
-		// for now MongoURI is Zero Value, we will overwrite it later
+		Debug:     true,
+		SecretKey: "development key",
 	}
-
-	// Override from Environment (Like app.config.from_envvar)
 	if envKey := os.Getenv("SECRET_KEY"); envKey != "" {
 		config.SecretKey = envKey
 	}
-
 	ResolveClientDB()
 
+	// 2. Create the main router
 	router := mux.NewRouter()
-	router.Use(beforeAfterMiddleware)
-	router.Use(AuthMiddleware)
 
-	// Serve static files
+	// Serve static files on the main router
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 
-	router.HandleFunc("/", PublicTimelineHandler).Methods("GET")
-	router.HandleFunc("/timeline", PersonalTimelineHandler).Methods("GET")
-	router.HandleFunc("/register", RegisterHandler)
-	router.HandleFunc("/login", LoginHandler)
-	router.HandleFunc("/logout", LogoutHandler)
-	router.HandleFunc("/user/follow/{username}", followUser).Methods("GET")
-	router.HandleFunc("/user/unfollow/{username}", unfollowUser).Methods("GET")
-	router.HandleFunc("/user/{username}", UserTimelineHandler).Methods("GET")
-	router.HandleFunc("/add_message", AddMessageHandler).Methods("POST")
-	log.Fatal(http.ListenAndServe(":5000", AuthMiddleware(router)))
+	// ==========================================
+	// 3. API ROUTES (Simulator)
+	// ==========================================
+	// Initialize your new API handler from the 'api' package
+	apiHandler := api.NewAPI(db)
+
+	router.HandleFunc("/latest", apiHandler.GetLatestHandler).Methods("GET")
+
+	// The "Headers" matcher ensures JSON requests go to the API, not UI
+	router.HandleFunc("/register", apiHandler.RegisterHandler).Methods("POST").Headers("Content-Type", "application/json")
+
+	// Wrapping the protected API endpoints with the API's specific Basic Auth middleware
+	router.HandleFunc("/msgs", apiHandler.AuthMiddleware(apiHandler.GetMessagesHandler)).Methods("GET")
+	router.HandleFunc("/msgs/{username}", apiHandler.AuthMiddleware(apiHandler.UserMessagesHandler)).Methods("GET", "POST")
+	router.HandleFunc("/fllws/{username}", apiHandler.AuthMiddleware(apiHandler.FollowsHandler)).Methods("GET", "POST")
+
+	// ==========================================
+	// 4. UI ROUTES (Web Browser)
+	// ==========================================
+	// Creating a subrouter specifically for the UI pages
+	uiRouter := router.PathPrefix("/").Subrouter()
+
+	// Apply your UI session/cookie middleware ONLY to the UI routes
+	uiRouter.Use(beforeAfterMiddleware)
+	uiRouter.Use(AuthMiddleware)
+
+	// Original routes
+	uiRouter.HandleFunc("/", PublicTimelineHandler).Methods("GET")
+	uiRouter.HandleFunc("/timeline", PersonalTimelineHandler).Methods("GET")
+	uiRouter.HandleFunc("/register", RegisterHandler) // Matches standard form submissions
+	uiRouter.HandleFunc("/login", LoginHandler)
+	uiRouter.HandleFunc("/logout", LogoutHandler)
+	uiRouter.HandleFunc("/user/follow/{username}", followUser).Methods("GET")
+	uiRouter.HandleFunc("/user/unfollow/{username}", unfollowUser).Methods("GET")
+	uiRouter.HandleFunc("/user/{username}", UserTimelineHandler).Methods("GET")
+	uiRouter.HandleFunc("/add_message", AddMessageHandler).Methods("POST")
+	fmt.Println("Server running on port 5000...")
+	log.Fatal(http.ListenAndServe(":5000", router))
 }
 
 func getUserID(username string) primitive.ObjectID {
