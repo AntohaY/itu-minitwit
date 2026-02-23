@@ -41,6 +41,4 @@ services:
     depends_on:
       webserver:
         condition: service_healthy
-    networks:
-      - minitwit-network
     entrypoint: sh -c  "curl http://webserver:5000"
