@@ -151,8 +151,8 @@ func main() {
 	uiRouter.HandleFunc("/user/unfollow/{username}", unfollowUser).Methods("GET")
 	uiRouter.HandleFunc("/user/{username}", UserTimelineHandler).Methods("GET")
 	uiRouter.HandleFunc("/add_message", AddMessageHandler).Methods("POST")
-	fmt.Println("Server running on port 5000...")
-	log.Fatal(http.ListenAndServe(":5000", router))
+	fmt.Println("Server running on port 8080...")
+	log.Fatal(http.ListenAndServe(":8080", router))
 }
 
 func getUserID(username string) primitive.ObjectID {
