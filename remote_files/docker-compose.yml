@@ -1,0 +1,46 @@
+version: '1'
+services:
+  dbserver:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=minitwit
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+
+  webserver:
+    build:
+      context: ./new
+      dockerfile: ../docker/web/Dockerfile.dev
+
+    volumes:
+      - ./new:/app
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    depends_on:
+      dbserver:
+        condition: service_healthy
+    ports:
+      - "5001:5000"
+    environment:
+      - DB_IP=dbserver
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  clidownload:
+    image: curlimages/curl
+    depends_on:
+      webserver:
+        condition: service_healthy
+    networks:
+      - minitwit-network
+    entrypoint: sh -c  "curl http://webserver:5000"

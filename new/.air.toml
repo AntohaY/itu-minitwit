@@ -1,0 +1,16 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/main ."
+  bin = "./tmp/main"
+  delay = 1000
+  exclude_dir = ["assets", "tmp", "vendor", "testdata"]
+  include_ext = ["go", "tpl", "tmpl", "html"]  # <--- THIS IS THE KEY LINE
+  exclude_regex = ["_test.go"]
+
+[log]
+  time = true
+
+[misc]
+  clean_on_exit = true
