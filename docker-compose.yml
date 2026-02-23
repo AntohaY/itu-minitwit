@@ -1,14 +1,29 @@
-version: '1'
 services:
   dbserver:
-    image: ${DOCKER_USERNAME}/dbminitwitimage:latest
+    image: mongo:8.0
     ports:
       - "27017:27017"
     environment:
       - MONGO_INITDB_DATABASE=minitwit
+    volumes:
+      # Keeps your local MongoDB data from disappearing on restart
+      - mongo_local_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   webserver:
-    image: ${DOCKER_USERNAME}/webminitwitimage:latest
+    build:
+      context: ./new
+      dockerfile: ../docker/web/Dockerfile.dev
+    volumes:
+      # This is the magic link! It syncs your local ./new folder to /app in the container
+      - ./new:/app
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     depends_on:
       dbserver:
         condition: service_healthy
@@ -17,8 +32,13 @@ services:
     environment:
       - DB_IP=dbserver
 
-    volumes:
-      - ./new:/app
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
+  clidownload:
+    build:
+      context: .
+      # Assuming your CLI tool uses this Dockerfile based on your GitHub Actions file
+      dockerfile: ./Dockerfile-flagtool
+    depends_on:
+      - webserver
+
+volumes:
+  mongo_local_data:
