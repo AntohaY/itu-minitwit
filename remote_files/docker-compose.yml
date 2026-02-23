@@ -7,6 +7,8 @@ services:
       - MONGO_INITDB_DATABASE=minitwit
     networks:
       - minitwit-network
+    volumes:
+      - minitwit_cloud_data:/data/db
     healthcheck:
       test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')" ]
       interval: 10s
@@ -33,3 +35,6 @@ services:
 networks:
   minitwit-network:
     driver: bridge
+
+volumes:
+  minitwit_cloud_data:
