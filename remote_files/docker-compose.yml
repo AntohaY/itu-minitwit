@@ -1,8 +1,6 @@
 services:
   dbserver:
     image: ${DOCKER_USERNAME}/dbminitwitimage:latest
-    ports:
-      - "27017:27017"
     environment:
       - MONGO_INITDB_DATABASE=minitwit
     networks:

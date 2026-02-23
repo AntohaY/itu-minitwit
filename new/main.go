@@ -25,7 +25,13 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/hex"
-	"fmt"           // replace print() in python
+	"fmt" // replace print() in python
+	"github.com/gorilla/mux"
+	"github.com/gorilla/sessions"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"html/template" // for rendering HTML templates
 	"log"           // for error reporting
 	"minitwit/api"
@@ -33,13 +39,7 @@ import (
 	"os"       // read environment variables (for example DB_IP)
 	"strings"
 	"time"
-
-	"github.com/gorilla/mux"
-	"github.com/gorilla/sessions"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	_ "time/tzdata"
 )
 
 type Configuration struct {
@@ -182,8 +182,15 @@ func getUserID(username string) primitive.ObjectID {
 
 // time stemp means how many seconds passed since january 1st,1970
 func formatDatetime(timestamp int64) string {
-	timezone, _ := time.LoadLocation("Europe/Warsaw")
-	t := time.Unix(timestamp, 0).In(timezone) //(0 means zero nanoseconds)
+	timezone, err := time.LoadLocation("Europe/Warsaw")
+
+	if err != nil {
+		// Logging the error so we can see it in 'docker logs' if it ever breaks
+		log.Printf("Warning: Could not load Warsaw timezone, falling back to UTC: %v", err)
+		timezone = time.UTC
+	}
+
+	t := time.Unix(timestamp, 0).In(timezone)
 	return t.Format("2006-01-02 @ 15:04")
 }
 
