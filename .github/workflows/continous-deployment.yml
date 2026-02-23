@@ -81,11 +81,12 @@ jobs:
           SSH_KEY: ${{ secrets.SSH_KEY }}
 
       - name: Deploy to server
-        # Configure the ~./bash_profile and deploy.sh file on the Vagrantfile
-        run: >
-          ssh $SSH_USER@$SSH_HOST
-          -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no
-          '/minitwit/deploy.sh'
+        run: |
+          # 1. Securely copy the latest compose file and deploy script to the server
+          scp -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no remote_files/docker-compose.yml remote_files/deploy.sh $SSH_USER@$SSH_HOST:/minitwit/
+          
+          # 2. Make sure the script is executable, then run it
+          ssh $SSH_USER@$SSH_HOST -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no 'chmod +x /minitwit/deploy.sh && /minitwit/deploy.sh'
         env:
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
