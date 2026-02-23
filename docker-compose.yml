@@ -6,13 +6,14 @@ services:
     environment:
       - MONGO_INITDB_DATABASE=minitwit
     volumes:
-      # Keeps your local MongoDB data from disappearing on restart
       - mongo_local_data:/data/db
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      # Use the strict array syntax so Docker doesn't fail on the pipe
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
   webserver:
     build:
@@ -27,21 +28,25 @@ services:
       dbserver:
         condition: service_healthy
     ports:
-      - "8080"
+      # Map host port to container port so you can access it in your browser!
+      - "8080:8080"
     environment:
-      - DB_IP=
+      # Give the Go app the database hostname so it doesn't crash!
+      - DB_IP=dbserver
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8080" ]
-      interval: 30s
-      timeout: 10s
+      interval: 10s
+      timeout: 5s
       retries: 5
+      # Give Air 30 seconds to compile your Go code before testing it
+      start_period: 30s
 
   clidownload:
     image: curlimages/curl
     depends_on:
       webserver:
         condition: service_healthy
-    entrypoint: sh -c  "curl http://webserver:8080"
+    entrypoint: sh -c "curl http://webserver:8080"
 
 volumes:
   mongo_local_data:

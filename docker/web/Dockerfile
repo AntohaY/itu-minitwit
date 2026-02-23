@@ -1,32 +1,27 @@
-######### COMMENTED OUT CONFIGURATION FOR MINITWIT.PY ###########
-
-# FROM python:3.9-alpine
-
-# WORKDIR /usr/src/app
-
-# ENV DB_IP="dbserver"
-
-# COPY requirements.txt ./
-# RUN pip install --no-cache-dir -r requirements.txt
-
-# COPY . .
-
-# CMD [ "python", "./minitwit.py" ]
-
-######### CONFIGURATION FOR GO FILE ###########
-
-# 1. Start with Go
-FROM golang:1.25
-
+# ==========================================
+# STAGE 1: Build the app
+# ==========================================
+FROM golang:1.24 AS builder
 WORKDIR /usr/src/app
 
-# 2. Copy files
+# Copy your code into the builder
 COPY new/ .
-COPY new/templates/ ./templates/
-COPY static/ ./static/
 
-# 3. BUILD the app (This creates a file named 'minitwit-server')
-RUN go build -o minitwit-server main.go
+# Build the Go binary securely for Linux
+RUN CGO_ENABLED=0 GOOS=linux go build -o minitwit-server main.go
 
-# 4. Run the BINARY (Not the text file)
+# ==========================================
+# STAGE 2: Create the tiny production image
+# ==========================================
+FROM alpine:latest
+WORKDIR /usr/src/app
+
+# Copy ONLY the compiled binary from Stage 1
+COPY --from=builder /usr/src/app/minitwit-server .
+
+# Copy your static files and templates (adjust paths if they differ)
+COPY --from=builder /usr/src/app/templates/ ./templates/
+COPY --from=builder /usr/src/app/static/ ./static/
+
+# Run the binary
 CMD [ "./minitwit-server" ]

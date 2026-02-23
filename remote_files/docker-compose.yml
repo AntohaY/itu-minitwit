@@ -5,6 +5,8 @@ services:
       - "27017:27017"
     environment:
       - MONGO_INITDB_DATABASE=minitwit
+    networks:
+      - minitwit-network
     healthcheck:
       test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')" ]
       interval: 10s
@@ -18,9 +20,16 @@ services:
       dbserver:
         condition: service_healthy
     ports:
-      - "8080"
+      # Map regular web traffic (80) to your Go app (8080)
+      - "80:8080"
     environment:
       - DB_IP=dbserver
     dns:
       - 8.8.8.8
       - 8.8.4.4
+    networks:
+      - minitwit-network
+
+networks:
+  minitwit-network:
+    driver: bridge
