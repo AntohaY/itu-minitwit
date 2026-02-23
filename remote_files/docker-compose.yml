@@ -6,10 +6,11 @@ services:
     environment:
       - MONGO_INITDB_DATABASE=minitwit
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
-      interval: 30s
+      test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')" ]
+      interval: 10s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 60s
 
   webserver:
     image: ${DOCKER_USERNAME}/webminitwitimage:latest
