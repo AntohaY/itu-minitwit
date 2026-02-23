@@ -11,8 +11,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    networks:
-      - minitwit-network
+
 
   webserver:
     build:
@@ -36,8 +35,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-    networks:
-      - minitwit-network
 
   clidownload:
     image: curlimages/curl
@@ -47,7 +44,3 @@ services:
     networks:
       - minitwit-network
     entrypoint: sh -c  "curl http://webserver:5000"
-
-networks:
-  minitwit-network:
-    driver: bridge
