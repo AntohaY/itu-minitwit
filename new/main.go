@@ -107,6 +107,13 @@ func main() {
 	if envKey := os.Getenv("SECRET_KEY"); envKey != "" {
 		config.SecretKey = envKey
 	}
+
+	store.Options = &sessions.Options{
+		Path:     "/",
+		MaxAge:   86400 * 7, // 7 days (in seconds)
+		HttpOnly: true,
+		Secure:   false, // Setting to false for DigitalOcean because of HTTP and not HTTPS.
+	}
 	ResolveClientDB()
 
 	// 2. Create the main router
