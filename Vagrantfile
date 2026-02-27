@@ -33,7 +33,7 @@ Vagrant.configure("2") do |config|
     sudo rm /var/lib/dpkg/lock-frontend
 
     # Install docker and docker compose
-    sudo apt-get install -y docker.io docker-compose-v2
+    sudo apt-get install -y docker.io docker-compose-plugin
 
     sudo systemctl status docker
     # sudo usermod -aG docker ${USER}
@@ -59,7 +59,28 @@ Vagrant.configure("2") do |config|
 
     echo -e "\nVagrant setup done ..."
     echo -e "minitwit will later be accessible at http://$(hostname -I | awk '{print $1}'):5000"
-    echo -e "The mysql database needs a minute to initialize, if the landing page shows an error stack-trace ..."
     SHELL
   end
+    config.vm.provision "shell", inline: <<-SHELL
+      # 1. Define the username and the public key
+      TEAM_MEMBER="viktor"
+      PUB_KEY="ssh-ed25519 AAAAC3Nza... paste_alices_actual_public_key_here alice@example.com"
+
+      # 2. Create the user without prompting for a password
+      sudo adduser --disabled-password --gecos "" $TEAM_MEMBER
+
+      # 3. Create the SSH directory structure
+      sudo mkdir -p /home/$TEAM_MEMBER/.ssh
+
+      # 4. Add the public key to authorized_keys
+      echo "$PUB_KEY" | sudo tee /home/$TEAM_MEMBER/.ssh/authorized_keys > /dev/null
+
+      # 5. Set the strict SSH permissions (crucial!)
+      sudo chown -R $TEAM_MEMBER:$TEAM_MEMBER /home/$TEAM_MEMBER/.ssh
+      sudo chmod 700 /home/$TEAM_MEMBER/.ssh
+      sudo chmod 600 /home/$TEAM_MEMBER/.ssh/authorized_keys
+
+      # 6. Optional: Give them sudo (admin) and docker access
+      sudo usermod -aG sudo,docker $TEAM_MEMBER
+    SHELL
 end
