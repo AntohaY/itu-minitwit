@@ -35,7 +35,7 @@ jobs:
         with:
           allowed: major,minor,patch
           # This provides a default if no label is found, preventing the 'null' crash
-          default: patch 
+          default_match: patch 
 
       # 2. This step uses the output from above to determine the new version
       - name: Determine Version Bump
