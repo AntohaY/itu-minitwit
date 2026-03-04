@@ -2,7 +2,7 @@
 
 //1. you can do docker composition
 //docker-compose up --build
-//docker composition is set for port 5001! -> http://localhost:5001
+//docker composition is set for port 8080! -> http://localhost:8080
 
 //2. do it manually but than don't do step 1
 //start a temporary database
@@ -25,13 +25,7 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"encoding/hex"
-	"fmt" // replace print() in python
-	"github.com/gorilla/mux"
-	"github.com/gorilla/sessions"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"fmt"           // replace print() in python
 	"html/template" // for rendering HTML templates
 	"log"           // for error reporting
 	"minitwit/api"
@@ -40,6 +34,13 @@ import (
 	"strings"
 	"time"
 	_ "time/tzdata"
+
+	"github.com/gorilla/mux"
+	"github.com/gorilla/sessions"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Configuration struct {
@@ -295,6 +296,8 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var flashes []string
+
 	if r.Method == http.MethodPost {
 		r.ParseForm()
 		username := r.FormValue("username")
@@ -307,12 +310,15 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		if dberr != nil {
 			if dberr == mongo.ErrNoDocuments {
 				log.Println("User not found:", username)
+				flashes = append(flashes, "Invalid username")
 			} else {
+				flashes = append(flashes, "Database error occurred")
 				log.Println("Database error:", dberr)
 			}
 		} else {
 			if !checkPasswordHash(password, foundUser.HashedPW) {
 				log.Println("Password doesn't match")
+				flashes = append(flashes, "Invalid password")
 			} else {
 				session, _ := store.Get(r, "minitwit-session")
 				session.Values["user_id"] = foundUser.ID.Hex()
@@ -323,7 +329,12 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	RenderTemplate(w, "login.html", nil)
+	data := TimelineUserData{
+		PageTitle: "Sign In",
+		Flashes:   flashes,
+	}
+
+	RenderTemplate(w, "login.html", data)
 }
 
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
