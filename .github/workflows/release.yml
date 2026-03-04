@@ -33,7 +33,7 @@ jobs:
         with:
           # This looks for labels like 'bump:major', 'bump:minor', or 'bump:patch'
           # If no label is found, it defaults to a patch (0.0.X)
-          bump: ${{ github.event.pull_request.labels.*.name }} 
+          bump: ${{ join(github.event.pull_request.labels.*.name, ',') }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create GitHub Release
