@@ -11,15 +11,17 @@ name: Automated Release
 #If label will not be found, patch number will be increased by one 
 
 on:
-  push:
+  pull_request:
     branches:
       - main  # Trigger only when code is merged into main
+    types: [closed]
 
 permissions:
   contents: write  # Allows the robot to create tags and releases
 
 jobs:
   build-and-release:
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
