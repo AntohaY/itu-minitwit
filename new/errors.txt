@@ -1,3 +1,0 @@
-timeout_errors = val
-databese_errors = val2
-uppon_to_many_followers = val3
