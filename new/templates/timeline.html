@@ -53,4 +53,29 @@
     <li><em>There's no message so far.</em></li>
     {{end}}
   </ul>
+
+  <!-- Pagination controls -->
+  <div class="pagination">
+    {{if ne .PrevPage -1}}
+      {{if eq .PageID "public"}}
+        <a href="/?page={{.PrevPage}}" class="prev"><< Previous</a>
+      {{else if eq .PageID "personal"}}
+        <a href="/timeline?page={{.PrevPage}}" class="prev"><< Previous</a>
+      {{else if eq .PageID "user"}}
+        <a href="/user/{{.ProfileUser.Username}}?page={{.PrevPage}}" class="prev"><< Previous</a>
+      {{end}}
+    {{end}}
+
+    <span class="page-info">Page {{.Page}}</span>
+
+    {{if ne .NextPage -1}}
+      {{if eq .PageID "public"}}
+        <a href="/?page={{.NextPage}}" class="next">Next >></a>
+      {{else if eq .PageID "personal"}}
+        <a href="/timeline?page={{.NextPage}}" class="next">Next >></a>
+      {{else if eq .PageID "user"}}
+        <a href="/user/{{.ProfileUser.Username}}?page={{.NextPage}}" class="next">Next >></a>
+      {{end}}
+    {{end}}
+  </div>
 {{end}}
