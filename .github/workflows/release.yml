@@ -8,7 +8,7 @@ name: Automated Release
             #y - minor
             #z - patch
 #Labels on pull request should be named as: bump:major', 'bump:minor', or 'bump:patch' to execute action properly
-#If label will not be found, action will fail the test 
+#If label will not be found, action will fail the test ! 
 
 on:
   pull_request:
