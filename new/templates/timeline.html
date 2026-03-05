@@ -58,11 +58,11 @@
   <div class="pagination">
     {{if ne .PrevPage -1}}
       {{if eq .PageID "public"}}
-        <a href="/?page={{.PrevPage}}" class="prev"><< Previous</a>
+        <a href="/?page={{.PrevPage}}" class="prev">&lt;&lt; Previous</a>
       {{else if eq .PageID "personal"}}
-        <a href="/timeline?page={{.PrevPage}}" class="prev"><< Previous</a>
+        <a href="/timeline?page={{.PrevPage}}" class="prev">&lt;&lt; Previous</a>
       {{else if eq .PageID "user"}}
-        <a href="/user/{{.ProfileUser.Username}}?page={{.PrevPage}}" class="prev"><< Previous</a>
+        <a href="/user/{{.ProfileUser.Username}}?page={{.PrevPage}}" class="prev">&lt;&lt; Previous</a>
       {{end}}
     {{end}}
 
