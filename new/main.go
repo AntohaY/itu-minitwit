@@ -31,6 +31,7 @@ import (
 	"minitwit/api"
 	"net/http" // built-in library which replace flask
 	"os"       // read environment variables (for example DB_IP)
+	"strconv"  // for string to int conversion
 	"strings"
 	"time"
 	_ "time/tzdata"
@@ -80,6 +81,9 @@ type TimelineUserData struct {
 	CurrentUser *User // The user currently logged in (can be nil)
 	IsFollowing bool
 	Flashes     []string
+	Page        int // Current page number
+	NextPage    int // Next page number (-1 if no next)
+	PrevPage    int // Previous page number (-1 if no prev)
 }
 
 // global variables
@@ -437,6 +441,8 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	username := vars["username"]
 
+	skip, page := getPageAndSkip(r.URL.Query().Get("page"))
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -468,8 +474,14 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	filter := bson.M{
+		"author_id": profileUser.ID,
+		"flagged":   false,
+	}
 	// 4. Get Messages & Fill Missing Data
-	opts := options.Find().SetSort(bson.M{"pub_date": -1}).SetLimit(PER_PAGE)
+	opts := options.Find().SetSort(bson.D{{Key: "pub_date", Value: -1}, {Key: "_id", Value: -1}}).SetSkip(int64(skip)).SetLimit(int64(PER_PAGE))
+
+	totalMessages, _ := db.Collection("message").CountDocuments(ctx, filter)
 
 	cursor, err := db.Collection("message").Find(ctx, bson.M{
 		"author_id": profileUser.ID,
@@ -504,7 +516,11 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 			messages = append(messages, msg)
 		}
 	}
-	// 5. Render
+
+	// 5. Determine next/prev pages
+	nextPage, prevPage := calculateNextPage(totalMessages, page)
+
+	// 6. Render
 	data := TimelineUserData{
 		PageTitle:   profileUser.Username + "'s Timeline",
 		PageID:      "user",
@@ -513,6 +529,9 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: currUser,
 		IsFollowing: followed,
 		Flashes:     getFlash(w, r),
+		Page:        page,
+		NextPage:    nextPage,
+		PrevPage:    prevPage,
 	}
 
 	RenderTemplate(w, "timeline.html", data)
@@ -599,7 +618,7 @@ func unfollowUser(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/user/"+username, http.StatusSeeOther)
 }
 
-func queryDatabaseForMessages(limit int) ([]Message, error) {
+func queryDatabaseForMessages(limit int, skip int) ([]Message, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -609,6 +628,8 @@ func queryDatabaseForMessages(limit int) ([]Message, error) {
 		{{Key: "$match", Value: bson.D{{Key: "flagged", Value: false}}}},
 
 		{{Key: "$sort", Value: bson.D{{Key: "pub_date", Value: -1}}}},
+
+		{{Key: "$skip", Value: skip}},
 
 		{{Key: "$limit", Value: limit}},
 
@@ -655,7 +676,7 @@ func queryDatabaseForMessages(limit int) ([]Message, error) {
 	return messages, nil
 }
 
-func getFollowedMessages(userID primitive.ObjectID, limit int) ([]Message, error) {
+func getFollowedMessages(userID primitive.ObjectID, limit int, skip int) ([]Message, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -694,6 +715,9 @@ func getFollowedMessages(userID primitive.ObjectID, limit int) ([]Message, error
 
 		// SORT: Newest first
 		{{Key: "$sort", Value: bson.D{{Key: "pub_date", Value: -1}}}},
+
+		// SKIP
+		{{Key: "$skip", Value: skip}},
 
 		// LIMIT
 		{{Key: "$limit", Value: limit}},
@@ -746,6 +770,9 @@ func getFollowedMessages(userID primitive.ObjectID, limit int) ([]Message, error
 }
 
 func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
+	// Get page parameter from query string
+	skip, page := getPageAndSkip(r.URL.Query().Get("page"))
+
 	// 1. Get Current User (Security check)
 	var currUser *User
 	if u := r.Context().Value("user"); u != nil {
@@ -760,24 +787,46 @@ func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 2. Logic: Get messages from user AND people they follow
 	// (You likely have a DB function for this, e.g., getFollowedMessages)
-	msgs, _ := getFollowedMessages(currUser.ID, PER_PAGE)
+	msgs, err := getFollowedMessages(currUser.ID, PER_PAGE, skip)
+	if err != nil {
+		log.Printf("error fetching followed messages for user %s: %v", currUser.ID.Hex(), err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 
-	// 3. Render
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	filter := bson.M{
+		"author_id": currUser.ID,
+		"flagged":   false,
+	}
+
+	totalMessages, _ := db.Collection("message").CountDocuments(ctx, filter)
+	// 3. Determine next/prev pages
+	nextPage, prevPage := calculateNextPage(totalMessages, page)
+
+	// 4. Render
 	data := TimelineUserData{
 		PageTitle:   "My Timeline",
 		PageID:      "personal", // <--- CRITICAL: Triggers the Input Box in HTML
 		Messages:    msgs,
 		CurrentUser: currUser,
 		ProfileUser: currUser,
+		Page:        page,
+		NextPage:    nextPage,
+		PrevPage:    prevPage,
 	}
 
 	RenderTemplate(w, "timeline.html", data)
 }
 
 func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
+	// Get page parameter from query string
+	skip, page := getPageAndSkip(r.URL.Query().Get("page"))
+
 	// 1. Get Messages
 	// (Assuming queryDatabaseForMessages returns []Message)
-	msgs, err := queryDatabaseForMessages(PER_PAGE)
+	msgs, err := queryDatabaseForMessages(PER_PAGE, skip)
 	if err != nil {
 		http.Error(w, "Database error: "+err.Error(), 500)
 		return
@@ -790,7 +839,17 @@ func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		currUser = &val
 	}
 
-	// 3. Setup Data
+	// 3. Determine next/prev pages
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	filter := bson.M{
+		"author_id": currUser.ID,
+		"flagged":   false,
+	}
+	totalMessages, _ := db.Collection("message").CountDocuments(ctx, filter)
+	nextPage, prevPage := calculateNextPage(totalMessages, page)
+
+	// 4. Setup Data
 	data := TimelineUserData{
 		PageTitle:   "Public Timeline",
 		PageID:      "public", // Matches {{if eq .PageID "public"}} in template
@@ -798,6 +857,9 @@ func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: currUser,
 		ProfileUser: nil,            // Not viewing a specific profile
 		Flashes:     getFlash(w, r), // Your flash helper
+		Page:        page,
+		NextPage:    nextPage,
+		PrevPage:    prevPage,
 	}
 
 	RenderTemplate(w, "timeline.html", data)
@@ -885,4 +947,31 @@ func getCurrentUser(r *http.Request) *User {
 	}
 
 	return &user
+}
+
+func getPageAndSkip(pageStr string) (int, int) {
+	page := 1
+	if pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	// Calculate skip for pagination
+	skip := (page - 1) * PER_PAGE
+	return skip, page
+}
+
+func calculateNextPage(totalMessages int64, page int) (int, int) {
+	nextPage := -1
+	if totalMessages > int64(page*PER_PAGE) {
+		nextPage = page + 1
+	}
+
+	prevPage := -1
+	if page > 1 {
+		prevPage = page - 1
+	}
+
+	return nextPage, prevPage
 }
