@@ -21,6 +21,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"crypto/md5"
 	"encoding/base64"
@@ -31,7 +32,9 @@ import (
 	"minitwit/api"
 	"net/http" // built-in library which replace flask
 	"os"       // read environment variables (for example DB_IP)
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 	_ "time/tzdata"
 
@@ -83,10 +86,15 @@ type TimelineUserData struct {
 }
 
 // global variables
-var config Configuration
-var dbClient *mongo.Client
-var db *mongo.Database // Specific handle to the "test" database
-var store = sessions.NewCookieStore([]byte("development key"))
+var (
+	config      Configuration
+	dbClient    *mongo.Client
+	db          *mongo.Database // Specific handle to the "test" database
+	store       = sessions.NewCookieStore([]byte("development key"))
+	errorCounts = make(map[string]int)
+	errorLogs   []string
+	logMutex    sync.Mutex
+)
 
 const PER_PAGE = 30 // Same as Python version
 
@@ -100,6 +108,8 @@ var funcMap = template.FuncMap{
 }
 
 func main() {
+	loadPreviousErrors() // if we would rerun our app, we want to load dictionary with our error values to our program memory
+
 	// 1. Load Configuration & Connect to DB
 	config = Configuration{
 		Debug:     true,
@@ -163,6 +173,71 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
 
+func loadPreviousErrors() {
+	// 1. Open the tracker file
+	file, err := os.Open("error_logs/errors_tracker.log")
+	if err != nil {
+		return
+	}
+	defer file.Close()
+
+	logMutex.Lock()
+	defer logMutex.Unlock()
+
+	scanner := bufio.NewScanner(file) //read the file
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "- ") {
+			// Your format is: "- <Error Message>: <Number> times"
+
+			lastColonIdx := strings.LastIndex(line, ":") //LastIndex is parsing from the right side, it finds the number in the end of line
+			if lastColonIdx == -1 {
+				continue
+			}
+
+			msg := line[2:lastColonIdx]                        // Extract the message text (stripping the "- " from the front)
+			numStr := strings.TrimSpace(line[lastColonIdx+1:]) // Extract the number (stripping the " times" from the end)
+			numStr = strings.TrimSuffix(numStr, " times")
+
+			count, err := strconv.Atoi(numStr) // Convert the text number back to an integer
+			if err == nil {
+				errorCounts[msg] = count
+			}
+		}
+	}
+}
+
+func logFollowError(errorMessage string) {
+	logMutex.Lock()
+	defer logMutex.Unlock()
+
+	errorCounts[errorMessage]++
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	entry := fmt.Sprintf("[%s] %s", timestamp, errorMessage)
+	errorLogs = append(errorLogs, entry)
+
+	// --- FILE 1: THE PERMANENT LOG (Nothing is ever erased) ---
+	// We use O_APPEND and NO O_TRUNC here
+	fHistory, err := os.OpenFile("error_logs/errors_history.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err == nil {
+		fmt.Fprintln(fHistory, entry)
+		fHistory.Close()
+	}
+
+	// --- FILE 2: THE DASHBOARD (Rewritten every time for easy reading) ---
+	// We keep O_TRUNC here to keep the counters at the top
+	fDash, err := os.OpenFile("error_logs/errors_tracker.log", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return
+	}
+	defer fDash.Close()
+
+	fmt.Fprintln(fDash, "=== LIVE SESSION SUMMARY ===")
+	for msg, count := range errorCounts {
+		fmt.Fprintf(fDash, "- %s: %d times\n", msg, count)
+	}
+}
+
 func getUserID(username string) primitive.ObjectID {
 	// Create a variable to hold the answer
 	var result struct {
@@ -221,6 +296,13 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			if err == nil {
 				ctx := context.WithValue(r.Context(), "user", currentUser) // we create updated context
 				r = r.WithContext(ctx)                                     // update the request with the new context
+			} else {
+				// TUTAJ JEST ROZWIĄZANIE TWOJEGO PROBLEMU:
+				if err == context.DeadlineExceeded {
+					logFollowError("DB Timeout: AuthMiddleware could not connect to DB in 5s")
+				} else if err != mongo.ErrNoDocuments {
+					logFollowError("DB Error: AuthMiddleware crashed while verifying session")
+				}
 			}
 		}
 
@@ -519,10 +601,10 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func followUser(w http.ResponseWriter, r *http.Request) {
-	// if not g.user: abort(401)
 	currentUser := r.Context().Value("user")
 	if currentUser == nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized) // abort(401)
+		logFollowError("Unauthorized user (user not found) tried to follow another user or DB problem")
 		return
 	}
 	user := currentUser.(User)
@@ -537,65 +619,96 @@ func followUser(w http.ResponseWriter, r *http.Request) {
 	err := db.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&profileUser)
 	if err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
+		if err == context.DeadlineExceeded {
+			logFollowError("DB Timeout: FindOne took more than 5s for user")
+		} else {
+			logFollowError("Not found: we couldnt follow some user because he/she doesnt exsit")
+		}
 		return
 	}
+
+	if user.ID == profileUser.ID {
+		logFollowError("Logic Error: User (Some user) tried to follow themselves")
+		http.Redirect(w, r, "/user/"+username, http.StatusSeeOther)
+		return
+	}
+
 	whomID := profileUser.ID
-	// g.db.execute('insert into follower (who_id, whom_id) values (?, ?)', [session['user_id'], whom_id])
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	db.Collection("follower").InsertOne(ctx, bson.M{
+	_, insertErr := db.Collection("follower").InsertOne(ctx, bson.M{
 		"who_id":  user.ID,
 		"whom_id": whomID,
 	})
+	if insertErr != nil {
+		logFollowError("DB Error: InsertOne failed for following (some user)")
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
 	// g.db.commit() - MongoDB auto-commits
-
-	// flash('You are now following "%s"' % username)
-	session, _ := store.Get(r, "minitwit-session")
-	session.AddFlash("You are now following \"" + username + "\"")
-	session.Save(r, w)
-
-	// return redirect(url_for('user_timeline', username=username))
-	//log.Println("DEBUG: Redirecting user to /user/" + username)
+	session, cookies_error := store.Get(r, "minitwit-session")
+	if cookies_error != nil {
+		logFollowError("error on cookies (flash)")
+	} else {
+		session.AddFlash("You are now following \"" + username + "\"")
+		session.Save(r, w)
+	}
 	http.Redirect(w, r, "/user/"+username, http.StatusSeeOther)
 }
 
 func unfollowUser(w http.ResponseWriter, r *http.Request) {
-	// if not g.user: abort(401)
+	// 1. Auth Check
 	currentUser := r.Context().Value("user")
 	if currentUser == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized) // abort(401)
+		logFollowError("Unauthorized: Someone tried to unfollow without login")
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 	user := currentUser.(User)
 	username := mux.Vars(r)["username"]
 
-	// whom_id = get_user_id(username)
+	// 2. Find the user to unfollow
 	var profileUser User
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	defer cancel() // Ensures the timer is stopped when function returns
 
 	err := db.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&profileUser)
 	if err != nil {
+		if err == context.DeadlineExceeded {
+			logFollowError("DB Timeout: FindOne took more than 5s for user (some user)")
+		} else {
+			logFollowError("Not Found: Could not unfollow (some user) because they do not exist")
+		}
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
-	whomID := profileUser.ID
 
-	// g.db.execute('delete from follower where who_id=? and whom_id=?', [session['user_id'], whom_id])
+	// 3. Delete the relationship
+	// Re-initializing context/cancel for the second DB operation
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	db.Collection("follower").DeleteOne(ctx, bson.M{
+
+	_, deleteErr := db.Collection("follower").DeleteOne(ctx, bson.M{
 		"who_id":  user.ID,
-		"whom_id": whomID,
+		"whom_id": profileUser.ID,
 	})
-	// g.db.commit() - MongoDB auto-commits
 
-	// flash('You are no longer following "%s"' % username)
-	session, _ := store.Get(r, "minitwit-session")
-	session.AddFlash("You are no longer following \"" + username + "\"")
-	session.Save(r, w)
+	if deleteErr != nil {
+		logFollowError("DB Error: DeleteOne failed for unfollowing " + username)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return // Prevents redirecting if the deletion failed
+	}
 
-	// return redirect(url_for('user_timeline', username=username))
+	// 4. Handle Flash Messages and Redirect
+	session, cookies_error := store.Get(r, "minitwit-session")
+	if cookies_error != nil {
+		logFollowError("Session Error: Failed to get session for unfollow flash")
+	} else {
+		session.AddFlash("You are no longer following \"" + username + "\"")
+		session.Save(r, w)
+	}
+
 	http.Redirect(w, r, "/user/"+username, http.StatusSeeOther)
 }
 
@@ -811,6 +924,7 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 
 	userVal := r.Context().Value("user")
 	if userVal == nil {
+		logFollowError("POST ERROR: Unauthorized user tried to create a post")
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -833,6 +947,11 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 
 		_, err := collection.InsertOne(ctx, doc)
 		if err != nil {
+			if err == context.DeadlineExceeded {
+				logFollowError("POST DB TIMEOUT: Message creation took >5s for user " + currentUser.Username)
+			} else {
+				logFollowError("POST DB ERROR: Failed to insert message for " + currentUser.Username + ": " + err.Error())
+			}
 			http.Error(w, "Database error", http.StatusInternalServerError)
 			log.Println("Insert error:", err)
 			return
