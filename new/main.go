@@ -441,16 +441,7 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	username := vars["username"]
 
-	// Get page parameter from query string
-	page := 1
-	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
-		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
-			page = p
-		}
-	}
-
-	// Calculate skip for pagination
-	skip := (page - 1) * PER_PAGE
+	skip, page := getPageAndSkip(r.URL.Query().Get("page"))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -483,8 +474,14 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	filter := bson.M{
+		"author_id": profileUser.ID,
+		"flagged":   false,
+	}
 	// 4. Get Messages & Fill Missing Data
-	opts := options.Find().SetSort(bson.M{"pub_date": -1}).SetSkip(int64(skip)).SetLimit(int64(PER_PAGE))
+	opts := options.Find().SetSort(bson.D{{Key: "pub_date", Value: -1}, {Key: "_id", Value: -1}}).SetSkip(int64(skip)).SetLimit(int64(PER_PAGE))
+
+	totalMessages, _ := db.Collection("message").CountDocuments(ctx, filter)
 
 	cursor, err := db.Collection("message").Find(ctx, bson.M{
 		"author_id": profileUser.ID,
@@ -521,14 +518,7 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 5. Determine next/prev pages
-	nextPage := -1
-	if len(messages) == PER_PAGE {
-		nextPage = page + 1
-	}
-	prevPage := -1
-	if page > 1 {
-		prevPage = page - 1
-	}
+	nextPage, prevPage := calculateNextPage(totalMessages, page)
 
 	// 6. Render
 	data := TimelineUserData{
@@ -781,15 +771,7 @@ func getFollowedMessages(userID primitive.ObjectID, limit int, skip int) ([]Mess
 
 func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	// Get page parameter from query string
-	page := 1
-	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
-		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
-			page = p
-		}
-	}
-
-	// Calculate skip for pagination
-	skip := (page - 1) * PER_PAGE
+	skip, page := getPageAndSkip(r.URL.Query().Get("page"))
 
 	// 1. Get Current User (Security check)
 	var currUser *User
@@ -807,15 +789,16 @@ func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	// (You likely have a DB function for this, e.g., getFollowedMessages)
 	msgs, _ := getFollowedMessages(currUser.ID, PER_PAGE, skip)
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	filter := bson.M{
+		"author_id": currUser.ID,
+		"flagged":   false,
+	}
+
+	totalMessages, _ := db.Collection("message").CountDocuments(ctx, filter)
 	// 3. Determine next/prev pages
-	nextPage := -1
-	if len(msgs) == PER_PAGE {
-		nextPage = page + 1
-	}
-	prevPage := -1
-	if page > 1 {
-		prevPage = page - 1
-	}
+	nextPage, prevPage := calculateNextPage(totalMessages, page)
 
 	// 4. Render
 	data := TimelineUserData{
@@ -834,15 +817,7 @@ func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 
 func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	// Get page parameter from query string
-	page := 1
-	if pageStr := r.URL.Query().Get("page"); pageStr != "" {
-		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
-			page = p
-		}
-	}
-
-	// Calculate skip for pagination
-	skip := (page - 1) * PER_PAGE
+	skip, page := getPageAndSkip(r.URL.Query().Get("page"))
 
 	// 1. Get Messages
 	// (Assuming queryDatabaseForMessages returns []Message)
@@ -860,14 +835,14 @@ func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 3. Determine next/prev pages
-	nextPage := -1
-	if len(msgs) == PER_PAGE {
-		nextPage = page + 1
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	filter := bson.M{
+		"author_id": currUser.ID,
+		"flagged":   false,
 	}
-	prevPage := -1
-	if page > 1 {
-		prevPage = page - 1
-	}
+	totalMessages, _ := db.Collection("message").CountDocuments(ctx, filter)
+	nextPage, prevPage := calculateNextPage(totalMessages, page)
 
 	// 4. Setup Data
 	data := TimelineUserData{
@@ -967,4 +942,31 @@ func getCurrentUser(r *http.Request) *User {
 	}
 
 	return &user
+}
+
+func getPageAndSkip(pageStr string) (int, int) {
+	page := 1
+	if pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	// Calculate skip for pagination
+	skip := (page - 1) * PER_PAGE
+	return skip, page
+}
+
+func calculateNextPage(totalMessages int64, page int) (int, int) {
+	nextPage := -1
+	if totalMessages > int64(page*PER_PAGE) {
+		nextPage = page + 1
+	}
+
+	prevPage := -1
+	if page > 1 {
+		prevPage = page - 1
+	}
+
+	return nextPage, prevPage
 }
