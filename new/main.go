@@ -787,7 +787,12 @@ func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 2. Logic: Get messages from user AND people they follow
 	// (You likely have a DB function for this, e.g., getFollowedMessages)
-	msgs, _ := getFollowedMessages(currUser.ID, PER_PAGE, skip)
+	msgs, err := getFollowedMessages(currUser.ID, PER_PAGE, skip)
+	if err != nil {
+		log.Printf("error fetching followed messages for user %s: %v", currUser.ID.Hex(), err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
