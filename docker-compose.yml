@@ -7,6 +7,8 @@ services:
       - MONGO_INITDB_DATABASE=minitwit
     volumes:
       - mongo_local_data:/data/db
+    networks: 
+      - itu-minitwit-network
     healthcheck:
       # Use the strict array syntax so Docker doesn't fail on the pipe
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
@@ -33,6 +35,8 @@ services:
     environment:
       # Give the Go app the database hostname so it doesn't crash!
       - DB_IP=dbserver
+    networks:
+      - itu-minitwit-network
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8080" ]
       interval: 10s
@@ -48,5 +52,36 @@ services:
         condition: service_healthy
     entrypoint: sh -c "curl http://webserver:8080"
 
+  grafana:
+    build: 
+      dockerfile: ./Dockerfile
+      context: ./monitoring/grafana
+    image: grafana_image
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - itu-minitwit-network
+    volumes:
+      - grafana-storage:/var/lib/grafana
+
+  prometheus:
+    build: 
+      dockerfile: ./Dockerfile
+      context: ./monitoring/prometheus
+    image: prometheus_image
+    container_name: prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    ports:
+      - "9090:9090"
+    networks:
+      - itu-minitwit-network
+
+networks: # MUST be defined here
+  itu-minitwit-network:
+    driver: bridge
+
 volumes:
   mongo_local_data:
+  grafana-storage: 
