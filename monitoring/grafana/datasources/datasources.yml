@@ -1,0 +1,9 @@
+apiVersion: 1
+
+# Inspired by https://community.grafana.com/t/solved-datasource-provisioning-prometheus/6300
+datasources:
+  - name: prometheus
+    type: prometheus
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
