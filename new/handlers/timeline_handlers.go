@@ -39,10 +39,12 @@ func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	// 3. Determine next/prev pages
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	// CHANGED: We only filter out flagged messages for the public total count
 	filter := bson.M{
-		"author_id": currUser.ID,
-		"flagged":   false,
+		"flagged": false,
 	}
+
 	totalMessages, _ := app.DB.Collection("message").CountDocuments(ctx, filter)
 	nextPage, prevPage := app.CalculateNextPage(totalMessages, page)
 
@@ -62,7 +64,6 @@ func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	app.RenderTemplate(w, "timeline.html", data)
 }
 
-// PersonalTimelineHandler displays the logged-in user's personal timeline
 func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	skip, page := app.GetPageAndSkip(r.URL.Query().Get("page"))
 
@@ -87,15 +88,8 @@ func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	filter := bson.M{
-		"author_id": currUser.ID,
-		"flagged":   false,
-	}
-
-	totalMessages, _ := app.DB.Collection("message").CountDocuments(ctx, filter)
-	// 3. Determine next/prev pages
+	// 3. Determine next/prev pages accurately!
+	totalMessages, _ := app.CountFollowedMessages(currUser.ID)
 	nextPage, prevPage := app.CalculateNextPage(totalMessages, page)
 
 	// 4. Render

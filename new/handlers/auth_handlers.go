@@ -81,6 +81,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
+	var flashes []string
 
 	if r.Method == http.MethodPost {
 		r.ParseForm()
@@ -94,12 +95,15 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		if dberr != nil {
 			if dberr == mongo.ErrNoDocuments {
 				log.Println("User not found:", username)
+				flashes = append(flashes, "Invalid username")
 			} else {
+				flashes = append(flashes, "Database error occurred")
 				log.Println("Database error:", dberr)
 			}
 		} else {
 			if !app.CheckPasswordHash(password, foundUser.HashedPW) {
 				log.Println("Password doesn't match")
+				flashes = append(flashes, "Invalid password")
 			} else {
 				session, _ := app.Store.Get(r, "minitwit-session")
 				session.Values["user_id"] = foundUser.ID.Hex()

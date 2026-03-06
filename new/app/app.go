@@ -362,3 +362,37 @@ func CalculateNextPage(totalMessages int64, page int) (int, int) {
 
 	return nextPage, prevPage
 }
+
+// CountFollowedMessages counts the total messages from a user and those they follow
+func CountFollowedMessages(userID primitive.ObjectID) (int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// 1. Get the list of people I follow
+	followerColl := DB.Collection("follower")
+	cursor, err := followerColl.Find(ctx, bson.M{"who_id": userID})
+	if err != nil {
+		return 0, err
+	}
+
+	// Start with the user's OWN ID
+	followedIDs := []primitive.ObjectID{userID}
+
+	for cursor.Next(ctx) {
+		var rel struct {
+			WhomID primitive.ObjectID `bson:"whom_id"`
+		}
+		if err := cursor.Decode(&rel); err == nil {
+			followedIDs = append(followedIDs, rel.WhomID)
+		}
+	}
+	cursor.Close(ctx)
+
+	// 2. Count the messages where author_id is IN our list
+	filter := bson.M{
+		"flagged":   false,
+		"author_id": bson.M{"$in": followedIDs},
+	}
+
+	return DB.Collection("message").CountDocuments(ctx, filter)
+}
