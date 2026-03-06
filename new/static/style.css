@@ -209,3 +209,28 @@ div.pagination span.page-info {
     color: #26776F;
     font-weight: bold;
 }
+
+@keyframes spinAround {
+  from {
+    /* Start at 0 degrees */
+    transform: rotate(0deg);
+    scale: 0.5;
+  }
+  to {
+    /* End at one full rotation (360 degrees) */
+    scale: 1.0;
+    transform: rotate(360deg);
+  }
+}
+
+.shrek-animation {
+  animation-name: spinAround;
+
+  animation-duration: 3s;
+
+  animation-timing-function: ease-in-out;
+
+  animation-iteration-count: 5;
+
+  display: inline-block;
+}

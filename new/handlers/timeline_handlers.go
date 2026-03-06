@@ -207,3 +207,25 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 
 	app.RenderTemplate(w, "timeline.html", data)
 }
+
+// NotFoundHandler displays a custom 404 error page
+func NotFoundHandler(w http.ResponseWriter, r *http.Request) {
+	// 1. Explicitly set the 404 status code header
+	w.WriteHeader(http.StatusNotFound)
+
+	// 2. Grab the current user so the navigation bar still works
+	var currUser *User
+	if u := r.Context().Value("user"); u != nil {
+		val := u.(User)
+		currUser = &val
+	}
+
+	// 3. Setup data for the layout
+	data := TimelineUserData{
+		PageTitle:   "Page Not Found",
+		CurrentUser: currUser,
+	}
+
+	// 4. Render your new template
+	app.RenderTemplate(w, "404.html", data)
+}

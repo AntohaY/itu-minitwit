@@ -62,6 +62,7 @@ func main() {
 	authMiddleware := AuthMiddleware(app.Store, app.DB)
 
 	router := mux.NewRouter()
+	router.NotFoundHandler = authMiddleware(http.HandlerFunc(handlers.NotFoundHandler))
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 
 	// ==========================================
