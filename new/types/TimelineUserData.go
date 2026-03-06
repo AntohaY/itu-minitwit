@@ -8,4 +8,7 @@ type TimelineUserData struct {
 	CurrentUser *User // The user currently logged in (can be nil)
 	IsFollowing bool
 	Flashes     []string
+	Page        int // Current page number
+	NextPage    int // Next page number (-1 if no next)
+	PrevPage    int // Previous page number (-1 if no prev)
 }

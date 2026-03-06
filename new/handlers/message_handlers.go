@@ -22,6 +22,7 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 
 	userVal := r.Context().Value("user")
 	if userVal == nil {
+		app.LogFollowError("POST ERROR: Unauthorized user tried to create a post")
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -44,6 +45,11 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 
 		_, err := collection.InsertOne(ctx, doc)
 		if err != nil {
+			if err == context.DeadlineExceeded {
+				app.LogFollowError("POST DB TIMEOUT: Message creation took >5s for user " + currentUser.Username)
+			} else {
+				app.LogFollowError("POST DB ERROR: Failed to insert message for " + currentUser.Username + ": " + err.Error())
+			}
 			http.Error(w, "Database error", http.StatusInternalServerError)
 			log.Println("Insert error:", err)
 			return

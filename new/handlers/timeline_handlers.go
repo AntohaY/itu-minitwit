@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -18,25 +19,44 @@ import (
 
 // PublicTimelineHandler displays the public timeline with all messages
 func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
-	msgs, err := app.QueryDatabaseForMessages(app.PER_PAGE)
+	skip, page := app.GetPageAndSkip(r.URL.Query().Get("page"))
+
+	// 1. Get Messages
+	// (Assuming queryDatabaseForMessages returns []Message)
+	msgs, err := app.QueryDatabaseForMessages(app.PER_PAGE, skip)
 	if err != nil {
 		http.Error(w, "Database error: "+err.Error(), 500)
 		return
 	}
 
+	// 2. Get Current User (if logged in)
 	var currUser *User
 	if u := r.Context().Value("user"); u != nil {
-		val := u.(User)
+		val := u.(User) // Cast interface{} to User struct
 		currUser = &val
 	}
 
+	// 3. Determine next/prev pages
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	filter := bson.M{
+		"author_id": currUser.ID,
+		"flagged":   false,
+	}
+	totalMessages, _ := app.DB.Collection("message").CountDocuments(ctx, filter)
+	nextPage, prevPage := app.CalculateNextPage(totalMessages, page)
+
+	// 4. Setup Data
 	data := TimelineUserData{
 		PageTitle:   "Public Timeline",
-		PageID:      "public",
+		PageID:      "public", // Matches {{if eq .PageID "public"}} in template
 		Messages:    msgs,
 		CurrentUser: currUser,
-		ProfileUser: nil,
-		Flashes:     GetFlash(w, r),
+		ProfileUser: nil,            // Not viewing a specific profile
+		Flashes:     GetFlash(w, r), // Your flash helper
+		Page:        page,
+		NextPage:    nextPage,
+		PrevPage:    prevPage,
 	}
 
 	app.RenderTemplate(w, "timeline.html", data)
@@ -44,6 +64,9 @@ func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 
 // PersonalTimelineHandler displays the logged-in user's personal timeline
 func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
+	skip, page := app.GetPageAndSkip(r.URL.Query().Get("page"))
+
+	// 1. Get Current User (Security check)
 	var currUser *User
 	if u := r.Context().Value("user"); u != nil {
 		val := u.(User)
@@ -55,14 +78,36 @@ func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msgs, _ := app.GetFollowedMessages(currUser.ID, app.PER_PAGE)
+	// 2. Logic: Get messages from user AND people they follow
+	// (You likely have a DB function for this, e.g., getFollowedMessages)
+	msgs, err := app.GetFollowedMessages(currUser.ID, app.PER_PAGE, skip)
+	if err != nil {
+		log.Printf("error fetching followed messages for user %s: %v", currUser.ID.Hex(), err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	filter := bson.M{
+		"author_id": currUser.ID,
+		"flagged":   false,
+	}
+
+	totalMessages, _ := app.DB.Collection("message").CountDocuments(ctx, filter)
+	// 3. Determine next/prev pages
+	nextPage, prevPage := app.CalculateNextPage(totalMessages, page)
+
+	// 4. Render
 	data := TimelineUserData{
 		PageTitle:   "My Timeline",
-		PageID:      "personal",
+		PageID:      "personal", // <--- CRITICAL: Triggers the Input Box in HTML
 		Messages:    msgs,
 		CurrentUser: currUser,
 		ProfileUser: currUser,
+		Page:        page,
+		NextPage:    nextPage,
+		PrevPage:    prevPage,
 	}
 
 	app.RenderTemplate(w, "timeline.html", data)
@@ -73,9 +118,12 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	username := vars["username"]
 
+	skip, page := app.GetPageAndSkip(r.URL.Query().Get("page"))
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// 1. Find the Profile User
 	var profileUser User
 	err := app.DB.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&profileUser)
 	if err != nil {
@@ -83,12 +131,14 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 2. Get Current User (if any)
 	var currUser *User
 	if u := r.Context().Value("user"); u != nil {
 		val := u.(User)
 		currUser = &val
 	}
 
+	// 3. Check "Following" status
 	followed := false
 	if currUser != nil {
 		var result struct{}
@@ -101,7 +151,14 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	opts := options.Find().SetSort(bson.M{"pub_date": -1}).SetLimit(app.PER_PAGE)
+	filter := bson.M{
+		"author_id": profileUser.ID,
+		"flagged":   false,
+	}
+	// 4. Get Messages & Fill Missing Data
+	opts := options.Find().SetSort(bson.D{{Key: "pub_date", Value: -1}, {Key: "_id", Value: -1}}).SetSkip(int64(skip)).SetLimit(int64(app.PER_PAGE))
+
+	totalMessages, _ := app.DB.Collection("message").CountDocuments(ctx, filter)
 
 	cursor, err := app.DB.Collection("message").Find(ctx, bson.M{
 		"author_id": profileUser.ID,
@@ -111,27 +168,36 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	var messages []Message
 
 	if err == nil {
+		// A. Define a temporary struct that matches MongoDB types EXACTLY
 		var rawResults []struct {
 			Text     string             `bson:"text"`
-			PubDate  int64              `bson:"pub_date"`
-			AuthorID primitive.ObjectID `bson:"author_id"`
-			Flagged  bool               `bson:"flagged"`
+			PubDate  int64              `bson:"pub_date"`  // DB uses int64
+			AuthorID primitive.ObjectID `bson:"author_id"` // DB uses ObjectID
+			Flagged  bool               `bson:"flagged"`   // DB uses bool
 		}
 
+		// B. Decode into this safe struct first
+		// If this fails, we will now see the error!
 		if err := cursor.All(ctx, &rawResults); err != nil {
-			fmt.Println("Decoding error:", err)
+			fmt.Println("Decoding error:", err) // Check your terminal if empty!
 		}
 
+		// C. Manually map to your view struct (just like PublicTimeline)
 		for _, raw := range rawResults {
 			msg := Message{
 				Text:     raw.Text,
-				PubDate:  int(raw.PubDate),
+				PubDate:  int(raw.PubDate), // Convert int64 -> int
 				Username: profileUser.Username,
+				//Email:    profileUser.Email,
 			}
 			messages = append(messages, msg)
 		}
 	}
 
+	// 5. Determine next/prev pages
+	nextPage, prevPage := app.CalculateNextPage(totalMessages, page)
+
+	// 6. Render
 	data := TimelineUserData{
 		PageTitle:   profileUser.Username + "'s Timeline",
 		PageID:      "user",
@@ -140,6 +206,9 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: currUser,
 		IsFollowing: followed,
 		Flashes:     GetFlash(w, r),
+		Page:        page,
+		NextPage:    nextPage,
+		PrevPage:    prevPage,
 	}
 
 	app.RenderTemplate(w, "timeline.html", data)

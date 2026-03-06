@@ -1,0 +1,38 @@
+services:
+  dbserver:
+    image: ${DOCKER_USERNAME}/dbminitwitimage:latest
+    environment:
+      - MONGO_INITDB_DATABASE=minitwit
+    networks:
+      - minitwit-network
+    volumes:
+      - minitwit_cloud_data:/data/db
+    healthcheck:
+      test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')" ]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  webserver:
+    image: ${DOCKER_USERNAME}/webminitwitimage:latest
+    depends_on:
+      dbserver:
+        condition: service_healthy
+    ports:
+      # Map regular web traffic (80) to your Go app (8080)
+      - "80:8080"
+    environment:
+      - DB_IP=dbserver
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    networks:
+      - minitwit-network
+
+networks:
+  minitwit-network:
+    driver: bridge
+
+volumes:
+  minitwit_cloud_data:
