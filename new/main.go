@@ -221,7 +221,7 @@ func logFollowError(errorMessage string) {
 
 	// --- FILE 1: THE PERMANENT LOG (Nothing is ever erased) ---
 	// We use O_APPEND and NO O_TRUNC here
-	fHistory, err := os.OpenFile("error_logs/errors_history.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	fHistory, err := os.OpenFile("errors_history.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err == nil {
 		fmt.Fprintln(fHistory, entry)
 		fHistory.Close()
@@ -229,7 +229,7 @@ func logFollowError(errorMessage string) {
 
 	// --- FILE 2: THE DASHBOARD (Rewritten every time for easy reading) ---
 	// We keep O_TRUNC here to keep the counters at the top
-	fDash, err := os.OpenFile("error_logs/errors_tracker.log", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	fDash, err := os.OpenFile("errors_tracker.log", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return
 	}
