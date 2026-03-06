@@ -175,7 +175,7 @@ func main() {
 
 func loadPreviousErrors() {
 	// 1. Open the tracker file
-	file, err := os.Open("error_logs/errors_tracker.log")
+	file, err := os.OpenFile("errors_tracker.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
 		return
 	}
