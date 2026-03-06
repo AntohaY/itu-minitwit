@@ -7,8 +7,8 @@ name: Automated Release
             #x - major
             #y - minor
             #z - patch
-#Labels on pull request should be named as: bump:major', 'bump:minor', or 'bump:patch' to execute action properly
-#If label will not be found, action will fail the test ! 
+#Labels on pull request should be named as: 'major', 'minor', or 'patch' to execute action properly
+#If label will not be found, action will push patch as default 
 
 on:
   pull_request:
@@ -29,20 +29,26 @@ jobs:
         with:
           fetch-depth: 0  # Fetches all history so it can find the previous version tag
 
+# 1. This step identifies which label is present (major, minor, or patch)
+      - id: bump
+        uses: zwaldowski/match-label-action@v4
+        with:
+          allowed: major,minor,patch
+          # This provides a default if no label is found, preventing the 'null' crash
+          default_match: patch 
+
+      # 2. This step uses the output from above to determine the new version
       - name: Determine Version Bump
-        id: bump_logic
+        id: next_version
         uses: zwaldowski/semver-release-action@v3
         with:
-          # This looks for labels like 'bump:major', 'bump:minor', or 'bump:patch'
-          # If no label is found, it defaults to a patch (0.0.X)
-          bump: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-          github_token: ${{ secrets.RELEASE_TOKEN }}
+          bump: ${{ steps.bump.outputs.match }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
+      # 3. This step actually creates the release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.bump_logic.outputs.version }}
-          name: Release ${{ steps.bump_logic.outputs.version }}
-          generate_release_notes: true  # Automatically writes the list of changes
-        env:
-          github_token: ${{ secrets.RELEASE_TOKEN }}
+          tag_name: ${{ steps.next_version.outputs.version }}
+          name: Release ${{ steps.next_version.outputs.version }}
+          generate_release_notes: true

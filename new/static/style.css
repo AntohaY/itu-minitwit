@@ -176,3 +176,36 @@ div.error {
     padding: 4px;
     font-size: 13px;
 }
+
+/* Pagination Styles */
+div.pagination {
+    margin: 20px 0;
+    padding: 10px 0;
+    text-align: center;
+    border-top: 1px solid #D0EEEB;
+}
+
+div.pagination a,
+div.pagination span {
+    margin: 0 5px;
+}
+
+div.pagination a.prev,
+div.pagination a.next {
+    background: #105751;
+    color: white;
+    padding: 4px 8px;
+    text-decoration: none;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+div.pagination a.prev:hover,
+div.pagination a.next:hover {
+    background: #0A3B33;
+}
+
+div.pagination span.page-info {
+    color: #26776F;
+    font-weight: bold;
+}
