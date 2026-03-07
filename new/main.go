@@ -119,7 +119,7 @@ func main() {
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	)
-
+	ResolveClientDB()
 	loadPreviousErrors() // if we would rerun our app, we want to load dictionary with our error values to our program memory
 
 	// 1. Load Configuration & Connect to DB
@@ -137,7 +137,6 @@ func main() {
 		HttpOnly: true,
 		Secure:   false, // Setting to false for DigitalOcean because of HTTP and not HTTPS.
 	}
-	ResolveClientDB()
 
 	// 2. Create the main router
 	router := mux.NewRouter()

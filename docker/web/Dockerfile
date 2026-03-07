@@ -15,6 +15,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o minitwit-server main.go
 # ==========================================
 FROM alpine:latest
 WORKDIR /usr/src/app
+RUN apk add --no-cache curlv
 
 # Copy ONLY the compiled binary from Stage 1
 COPY --from=builder /usr/src/app/minitwit-server .
