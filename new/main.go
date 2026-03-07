@@ -102,6 +102,17 @@ var (
 	logMutex    sync.Mutex
 )
 
+// prometeus metrics
+
+var (
+	httpResponsesTotal = prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "minitwit_http_responses_total", // This matches Grafana!
+			Help: "Total number of HTTP responses sent to users",
+		},
+	)
+)
+
 const PER_PAGE = 30 // Same as Python version
 
 var funcMap = template.FuncMap{
@@ -114,10 +125,12 @@ var funcMap = template.FuncMap{
 }
 
 func main() {
+	//registering metrics for prometeus
 	reg := prometheus.NewRegistry()
 	reg.MustRegister(
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+		httpResponsesTotal,
 	)
 	ResolveClientDB()
 	loadPreviousErrors() // if we would rerun our app, we want to load dictionary with our error values to our program memory
@@ -140,6 +153,7 @@ func main() {
 
 	// 2. Create the main router
 	router := mux.NewRouter()
+	router.Use(metricsMiddleware)
 	router.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 	// Serve static files on the main router
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
@@ -182,6 +196,16 @@ func main() {
 	uiRouter.HandleFunc("/add_message", AddMessageHandler).Methods("POST")
 	fmt.Println("Server running on port 8080...")
 	log.Fatal(http.ListenAndServe(":8080", router))
+}
+
+func metricsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Add 1 to the Grafana counter!
+		httpResponsesTotal.Inc()
+
+		// Continue to the normal webpage
+		next.ServeHTTP(w, r)
+	})
 }
 
 func loadPreviousErrors() {
@@ -962,10 +986,13 @@ func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	// 3. Determine next/prev pages
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	// For the PUBLIC timeline, we just count all unflagged messages.
+	// No need to check currUser.ID!
 	filter := bson.M{
-		"author_id": currUser.ID,
-		"flagged":   false,
+		"flagged": false,
 	}
+
 	totalMessages, _ := db.Collection("message").CountDocuments(ctx, filter)
 	nextPage, prevPage := calculateNextPage(totalMessages, page)
 

@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 3,
   "links": [],
   "panels": [
     {
@@ -56,7 +56,6 @@
               "type": "linear"
             },
             "showPoints": "auto",
-            "showValues": false,
             "spanNulls": false,
             "stacking": {
               "group": "A",
@@ -101,7 +100,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.3",
+      "pluginVersion": "12.1.8",
       "targets": [
         {
           "datasource": {
@@ -109,14 +108,15 @@
             "uid": "fegat3x6evklcc"
           },
           "disableTextWrap": false,
-          "editorMode": "builder",
+          "editorMode": "code",
+          "exemplar": true,
           "expr": "minitwit_http_responses_total",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
           "instant": false,
           "interval": "",
-          "legendFormat": "Total Message Posts",
+          "legendFormat": "Total HTTP Responses",
           "range": true,
           "refId": "B",
           "useBackend": false
@@ -192,7 +192,7 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "12.3.3",
+      "pluginVersion": "12.1.8",
       "targets": [
         {
           "datasource": {
@@ -200,7 +200,7 @@
             "uid": "P1809F7CD0C75ACF3"
           },
           "editorMode": "code",
-          "expr": "up{instance=\"minitwit:5000\"}",
+          "expr": "up{job=\"itu-minittwit-app\"}",
           "hide": false,
           "instant": false,
           "legendFormat": "__auto",
@@ -214,7 +214,7 @@
   ],
   "preload": false,
   "refresh": "",
-  "schemaVersion": 42,
+  "schemaVersion": 41,
   "tags": [],
   "templating": {
     "list": []
@@ -225,7 +225,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "Minitwit Example Dashboard",
-  "uid": "fegau3n6gywaoa",
+  "title": "Time Respond",
+  "uid": "Time_respond",
   "version": 1
 }
