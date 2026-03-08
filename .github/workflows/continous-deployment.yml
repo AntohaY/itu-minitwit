@@ -54,6 +54,16 @@ jobs:
           cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/webminitwitimage:buildcache
           cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/webminitwitimage:buildcache,mode=max
 
+      - name: Build and push bot image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./new/bot
+          file: ./new/bot/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/discordbotimage:latest
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/discordbotimage:botbuildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/discordbotimage:botbuildcache,mode=max
+
 #      - name: Build and push flagtoolimage
 #        uses: docker/build-push-action@v6
 #        with:

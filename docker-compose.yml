@@ -76,10 +76,23 @@ services:
     networks:
       - minitwit-network
 
+  discordbot:
+    build:
+      context: ./new/bot
+      dockerfile: Dockerfile
+    depends_on:
+      dbserver:
+        condition: service_healthy
+    environment:
+      - MONGO_URI=mongodb://dbserver:27017
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+    networks:
+      - minitwit-network
+
 networks:
   minitwit-network:
     driver: bridge
 
 volumes:
   mongo_local_data:
-  grafana-storage: # <-- This was the missing line causing your error!
+  grafana-storage:
