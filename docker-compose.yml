@@ -7,8 +7,9 @@ services:
       - MONGO_INITDB_DATABASE=minitwit
     volumes:
       - mongo_local_data:/data/db
+    networks:
+      - minitwit-network
     healthcheck:
-      # Use the strict array syntax so Docker doesn't fail on the pipe
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
       interval: 10s
       timeout: 5s
@@ -28,17 +29,16 @@ services:
       dbserver:
         condition: service_healthy
     ports:
-      # Map host port to container port so you can access it in your browser!
       - "8080:8080"
     environment:
-      # Give the Go app the database hostname so it doesn't crash!
       - DB_IP=dbserver
+    networks:
+      - minitwit-network
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8080" ]
       interval: 10s
       timeout: 5s
       retries: 5
-      # Give Air 30 seconds to compile your Go code before testing it
       start_period: 30s
 
   clidownload:
@@ -46,7 +46,53 @@ services:
     depends_on:
       webserver:
         condition: service_healthy
+    networks:
+      - minitwit-network
     entrypoint: sh -c "curl http://webserver:8080"
+
+  grafana:
+    build:
+      dockerfile: ./Dockerfile
+      context: ./monitoring/grafana
+    image: grafana_image
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - minitwit-network
+    volumes:
+      - grafana-storage:/var/lib/grafana
+
+  prometheus:
+    build:
+      dockerfile: ./Dockerfile
+      context: ./monitoring/prometheus
+    image: prometheus_image
+    container_name: prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    ports:
+      - "9090:9090"
+    networks:
+      - minitwit-network
+
+  discordbot:
+    build:
+      context: ./new/bot
+      dockerfile: Dockerfile
+    depends_on:
+      dbserver:
+        condition: service_healthy
+    environment:
+      - MONGO_URI=mongodb://dbserver:27017
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+    networks:
+      - minitwit-network
+
+networks:
+  minitwit-network:
+    driver: bridge
 
 volumes:
   mongo_local_data:
+  grafana-storage:

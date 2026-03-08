@@ -44,6 +44,7 @@ func ResolveClientDB(config Configuration) (*mongo.Client, *mongo.Database) {
 		log.Fatal("Could not ping MongoDB:", err)
 	}
 
+	// Need to change this so that the database is not called test...
 	db = dbClient.Database("test")
 	fmt.Println("Successfully connected to MongoDB!")
 	fmt.Printf("Loaded Config: Debug=%v, SecretKey=%s\n", config.Debug, config.SecretKey)
