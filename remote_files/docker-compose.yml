@@ -20,7 +20,6 @@ services:
       dbserver:
         condition: service_healthy
     ports:
-      # Map regular web traffic (80) to your Go app (8080)
       - "80:8080"
     environment:
       - DB_IP=dbserver
@@ -30,9 +29,50 @@ services:
     networks:
       - minitwit-network
 
+  # --- NEW MONITORING SERVICES ---
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - minitwit-network
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_cloud_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - minitwit-network
+    volumes:
+      - grafana_cloud_data:/var/lib/grafana
+    restart: unless-stopped
+
+  discordbot:
+    image: ${DOCKER_USERNAME}/discordbotimage:latest
+    depends_on:
+      dbserver:
+        condition: service_healthy
+    environment:
+      - MONGO_URI=mongodb://dbserver:27017
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+    networks:
+      - minitwit-network
+    restart: unless-stopped
+
 networks:
   minitwit-network:
     driver: bridge
 
 volumes:
   minitwit_cloud_data:
+  prometheus_cloud_data:
+  grafana_cloud_data:
