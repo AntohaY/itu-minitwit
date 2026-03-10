@@ -92,11 +92,21 @@ jobs:
 
       - name: Deploy to server
         run: |
-          # Added remote_files/prometheus.yml to the scp command
-          scp -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no remote_files/docker-compose.yml remote_files/deploy.sh remote_files/prometheus.yml $SSH_USER@$SSH_HOST:/minitwit/
+          # 1. Create the .env file with ALL required variables
+          echo "DOCKER_USERNAME=$DOCKER_USERNAME" >> .env
+          echo "DISCORD_TOKEN=$DISCORD_TOKEN" >> .env
+          echo "GRAFANA_ADMIN_USER=$GRAFANA_ADMIN_USER" >> .env
+          echo "GRAFANA_ADMIN_PASSWORD=$GRAFANA_ADMIN_PASSWORD" >> .env
           
-          # Make sure the script is executable, then run it
+          # 2. scp the files AND the .env file to the server
+          scp -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no remote_files/docker-compose.yml remote_files/deploy.sh remote_files/prometheus.yml .env $SSH_USER@$SSH_HOST:/minitwit/
+          
+          # 3. Execute the deployment script
           ssh $SSH_USER@$SSH_HOST -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no 'chmod +x /minitwit/deploy.sh && cd /minitwit && ./deploy.sh'
         env:
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          GRAFANA_ADMIN_USER: ${{ secrets.GRAFANA_ADMIN_USER }}
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
