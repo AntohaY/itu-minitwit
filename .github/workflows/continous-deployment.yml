@@ -51,8 +51,18 @@ jobs:
           file: ./docker/web/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/webminitwitimage:latest
-          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/webminitwitimage:mysqlbuildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/webminitwitimage:mysqlbuildcache,mode=max
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/webminitwitimage:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/webminitwitimage:buildcache,mode=max
+
+      - name: Build and push bot image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./new/bot
+          file: ./new/bot/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/discordbotimage:latest
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/discordbotimage:botbuildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/discordbotimage:botbuildcache,mode=max
 
 #      - name: Build and push flagtoolimage
 #        uses: docker/build-push-action@v6
@@ -82,11 +92,11 @@ jobs:
 
       - name: Deploy to server
         run: |
-          # 1. Securely copy the latest compose file and deploy script to the server
-          scp -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no remote_files/docker-compose.yml remote_files/deploy.sh $SSH_USER@$SSH_HOST:/minitwit/
+          # Added remote_files/prometheus.yml to the scp command
+          scp -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no remote_files/docker-compose.yml remote_files/deploy.sh remote_files/prometheus.yml $SSH_USER@$SSH_HOST:/minitwit/
           
-          # 2. Make sure the script is executable, then run it
-          ssh $SSH_USER@$SSH_HOST -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no 'chmod +x /minitwit/deploy.sh && /minitwit/deploy.sh'
+          # Make sure the script is executable, then run it
+          ssh $SSH_USER@$SSH_HOST -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no 'chmod +x /minitwit/deploy.sh && cd /minitwit && ./deploy.sh'
         env:
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
