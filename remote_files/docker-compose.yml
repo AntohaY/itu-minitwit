@@ -57,6 +57,8 @@ services:
       - minitwit-network
     volumes:
       - grafana_cloud_data:/var/lib/grafana
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
     restart: unless-stopped
 
   discordbot:
