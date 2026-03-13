@@ -47,21 +47,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-var (
-	httpResponsesTotal = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "minitwit_http_responses_total", // This matches Grafana!
-			Help: "Total number of HTTP responses sent to users",
-		},
-	)
-)
-
 func main() {
 	reg := prometheus.NewRegistry()
+
 	reg.MustRegister(
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
-		httpResponsesTotal,
+		HttpResponsesTotal,
+		HttpDuration,
 	)
 
 	app.LoadPreviousErrors()
@@ -86,7 +79,7 @@ func main() {
 
 	router := mux.NewRouter()
 
-	router.Use(metricsMiddleware)
+	router.Use(MetricsMiddleware)
 	router.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 
 	router.NotFoundHandler = authMiddleware(http.HandlerFunc(handlers.NotFoundHandler))
@@ -130,14 +123,4 @@ func main() {
 	protectedUI.HandleFunc("/add_message", handlers.AddMessageHandler).Methods("POST")
 	fmt.Println("Server running on port 8080...")
 	log.Fatal(http.ListenAndServe(":8080", router))
-}
-
-func metricsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Add 1 to the Grafana counter!
-		httpResponsesTotal.Inc()
-
-		// Continue to the normal webpage
-		next.ServeHTTP(w, r)
-	})
 }

@@ -13,6 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 var db *mongo.Database
@@ -24,18 +25,30 @@ func main() {
 		mongoURI = "mongodb://localhost:27017" // fallback
 	}
 
+	// Set a 10-second timeout for the initial connection phase
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
 	if err != nil {
-		log.Fatal("Error connecting to MongoDB: ", err)
+		log.Fatal("Error initializing MongoDB client: ", err)
 	}
-	// Since our database is named test for now... Change later to "minitwit"
-	db = client.Database("test")
-	fmt.Println("Bot connected to MongoDB!")
 
-	// 2. Connect to Discord
+	// CLEANUP: Ensure we close the DB connection when the bot shuts down
+	defer func() {
+		if err = client.Disconnect(context.Background()); err != nil {
+			log.Println("Error disconnecting from MongoDB:", err)
+		}
+	}()
+
+	err = client.Ping(ctx, readpref.Primary())
+	if err != nil {
+		log.Fatal("Could not ping MongoDB: ", err)
+	}
+
+	db = client.Database("minitwit")
+	fmt.Println("Bot successfully connected and pinged MongoDB!")
+
 	token := os.Getenv("DISCORD_TOKEN")
 	if token == "" {
 		log.Fatal("DISCORD_TOKEN environment variable not set")
@@ -46,10 +59,8 @@ func main() {
 		log.Fatal("Error creating Discord session: ", err)
 	}
 
-	// Register the messageCreate func as a callback for MessageCreate events
 	dg.AddHandler(messageCreate)
 
-	// Open a websocket connection to Discord
 	err = dg.Open()
 	if err != nil {
 		log.Fatal("Error opening Discord connection: ", err)
@@ -60,22 +71,25 @@ func main() {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
+	// Gracefully shut down the Discord session
 	dg.Close()
+	fmt.Println("Bot shutting down...")
 }
 
-// This function will be called every time a new message is created on any channel
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-	// Ignore all messages created by the bot itself
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
 
 	if m.Content == "!users" {
-		// Count users in the "user" collection
 		collection := db.Collection("user")
-		count, err := collection.CountDocuments(context.Background(), bson.D{})
+
+		reqCtx, reqCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer reqCancel()
+
+		count, err := collection.CountDocuments(reqCtx, bson.D{})
 		if err != nil {
-			s.ChannelMessageSend(m.ChannelID, "Sorry, I couldn't reach the database.")
+			s.ChannelMessageSend(m.ChannelID, "Sorry, I couldn't reach the database right now.")
 			log.Println("DB Count Error:", err)
 			return
 		}

@@ -92,16 +92,16 @@ jobs:
 
       - name: Deploy to server
         run: |
-          # 1. Actually write the variables from GitHub Secrets into the .env file
+          # 1. Create the .env file with ALL required variables
           echo "DOCKER_USERNAME=$DOCKER_USERNAME" >> .env
           echo "DISCORD_TOKEN=$DISCORD_TOKEN" >> .env
           echo "GRAFANA_ADMIN_USER=$GRAFANA_ADMIN_USER" >> .env
           echo "GRAFANA_ADMIN_PASSWORD=$GRAFANA_ADMIN_PASSWORD" >> .env
           
-          # 2. Added the -r flag to copy directories, and added '.env' and 'monitoring'
-          scp -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no -r remote_files/docker-compose.yml remote_files/deploy.sh remote_files/prometheus.yml .env monitoring $SSH_USER@$SSH_HOST:/minitwit/
+          # 2. scp the files AND the .env file to the server
+          scp -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no remote_files/docker-compose.yml remote_files/deploy.sh remote_files/prometheus.yml .env $SSH_USER@$SSH_HOST:/minitwit/
           
-          # 3. Make sure the script is executable, then run it
+          # 3. Execute the deployment script
           ssh $SSH_USER@$SSH_HOST -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no 'chmod +x /minitwit/deploy.sh && cd /minitwit && ./deploy.sh'
         env:
           SSH_USER: ${{ secrets.SSH_USER }}
