@@ -26,7 +26,7 @@
         "type": "prometheus",
         "uid": "ituminitwitprometheus"
       },
-      "description": "Total incoming requests per second",
+      "description": "Total incoming requests per second, grouped by method and status",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -75,8 +75,8 @@
             "uid": "ituminitwitprometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(minitwit_http_responses_total[5m]))",
-          "legendFormat": "Total HTTP RPS",
+          "expr": "sum by (method, status) (rate(minitwit_http_responses_total[5m]))",
+          "legendFormat": "{{method}} - {{status}}",
           "range": true,
           "refId": "A"
         }
@@ -163,7 +163,7 @@
         "type": "prometheus",
         "uid": "ituminitwitprometheus"
       },
-      "description": "95th percentile of response times across all endpoints",
+      "description": "95th percentile of response times, grouped by method and status",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -213,8 +213,8 @@
             "uid": "ituminitwitprometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum(rate(minitwit_http_request_duration_seconds_bucket[5m])) by (le))",
-          "legendFormat": "P95 Response Time",
+          "expr": "histogram_quantile(0.95, sum by (le, method, status) (rate(minitwit_http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{method}} - {{status}}",
           "range": true,
           "refId": "A"
         }
