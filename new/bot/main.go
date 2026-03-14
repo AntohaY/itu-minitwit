@@ -46,7 +46,7 @@ func main() {
 		log.Fatal("Could not ping MongoDB: ", err)
 	}
 
-	db = client.Database("minitwit")
+	db = client.Database("test")
 	fmt.Println("Bot successfully connected and pinged MongoDB!")
 
 	token := os.Getenv("DISCORD_TOKEN")
