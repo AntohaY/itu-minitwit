@@ -58,15 +58,20 @@ func main() {
 	)
 
 	app.LoadPreviousErrors()
-	// Load Configuration
+
 	app.Config = Configuration{
 		Debug:     true,
 		SecretKey: "development key",
+		MongoURI:  "mongodb://dbserver:27017",
 	}
-	// Override from Environment
+
 	if envKey := os.Getenv("SECRET_KEY"); envKey != "" {
 		app.Config.SecretKey = envKey
 	}
+	if envMongo := os.Getenv("MONGO_URI"); envMongo != "" {
+		app.Config.MongoURI = envMongo
+	}
+
 	app.Store = sessions.NewCookieStore([]byte(app.Config.SecretKey))
 	app.Store.Options = &sessions.Options{
 		Path:     "/",
@@ -74,6 +79,7 @@ func main() {
 		HttpOnly: true,
 		Secure:   false,
 	}
+
 	app.DBClient, app.DB = ResolveClientDB(app.Config)
 	authMiddleware := AuthMiddleware(app.Store, app.DB)
 

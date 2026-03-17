@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"minitwit/app"
@@ -28,35 +29,36 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	currentUser := userVal.(User)
 
-	text := r.FormValue("text")
-
-	if text != "" {
-		collection := app.DB.Collection("message")
-
-		doc := bson.M{
-			"author_id": currentUser.ID,
-			"text":      text,
-			"pub_date":  time.Now().Unix(),
-			"flagged":   false,
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		_, err := collection.InsertOne(ctx, doc)
-		if err != nil {
-			if err == context.DeadlineExceeded {
-				app.LogFollowError("POST DB TIMEOUT: Message creation took >5s for user " + currentUser.Username)
-			} else {
-				app.LogFollowError("POST DB ERROR: Failed to insert message for " + currentUser.Username + ": " + err.Error())
-			}
-			http.Error(w, "Database error", http.StatusInternalServerError)
-			log.Println("Insert error:", err)
-			return
-		}
-
-		SetFlash(w, "Your message was recorded")
+	text := strings.TrimSpace(r.FormValue("text"))
+	if text == "" {
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
 	}
 
+	collection := app.DB.Collection("message")
+
+	doc := bson.M{
+		"author_id": currentUser.ID,
+		"text":      text,
+		"pub_date":  time.Now().Unix(),
+		"flagged":   false,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err := collection.InsertOne(ctx, doc)
+	if err != nil {
+		if err == context.DeadlineExceeded {
+			app.LogFollowError("POST DB TIMEOUT: Message creation took >5s for user " + currentUser.Username)
+		} else {
+			app.LogFollowError("POST DB ERROR: Failed to insert message for " + currentUser.Username + ": " + err.Error())
+		}
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		log.Println("Insert error:", err)
+		return
+	}
+
+	SetFlash(w, "Your message was recorded")
 	http.Redirect(w, r, "/", http.StatusFound)
 }

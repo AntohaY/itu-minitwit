@@ -1,8 +1,9 @@
 services:
   dbserver:
     image: ${DOCKER_USERNAME}/dbminitwitimage:latest
+    restart: unless-stopped
     environment:
-      - MONGO_INITDB_DATABASE=minitwit
+      - MONGO_INITDB_DATABASE=test
     networks:
       - minitwit-network
     volumes:
@@ -16,13 +17,14 @@ services:
 
   webserver:
     image: ${DOCKER_USERNAME}/webminitwitimage:latest
+    restart: unless-stopped
     depends_on:
       dbserver:
         condition: service_healthy
     ports:
       - "80:8080"
     environment:
-      - DB_IP=dbserver
+      - MONGO_URI=mongodb://dbserver:27017
     dns:
       - 8.8.8.8
       - 8.8.4.4
