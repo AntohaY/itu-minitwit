@@ -2,51 +2,81 @@ package db_setup
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"os"
 	"time"
 
 	. "minitwit/types"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func ResolveClientDB(config Configuration) (*mongo.Client, *mongo.Database) {
-	var dbClient *mongo.Client
-	var db *mongo.Database // Specific handle to the "test" database
-	// Setup Database URI (Replaces db_ip = os.getenv / app.config["MONGO_URI"])
-	dbIP := os.Getenv("DB_IP")
-	if dbIP == "" {
-		dbIP = "localhost" // Fallback if running outside Docker
-	}
-	config.MongoURI = fmt.Sprintf("mongodb://%s:27017", dbIP)
-
-	// Connect to MongoDB (Replaces mongo = PyMongo(app))
-	fmt.Println("Connecting to:", config.MongoURI)
-
-	// Create a context with a 10-second timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Connect
-	clientOptions := options.Client().ApplyURI(config.MongoURI)
-	var err error
-	dbClient, err = mongo.Connect(ctx, clientOptions)
-	if err != nil {
-		log.Fatal("Connection failed:", err)
+	uri := config.MongoURI
+	if uri == "" {
+		uri = "mongodb://dbserver:27017"
 	}
 
-	// Ping to verify
-	err = dbClient.Ping(ctx, nil)
+	clientOpts := options.Client().ApplyURI(uri)
+
+	dbClient, err := mongo.Connect(ctx, clientOpts)
 	if err != nil {
-		log.Fatal("Could not ping MongoDB:", err)
+		log.Fatal("mongo connect error:", err)
 	}
 
-	// Need to change this so that the database is not called test...
-	db = dbClient.Database("test")
-	fmt.Println("Successfully connected to MongoDB!")
-	fmt.Printf("Loaded Config: Debug=%v, SecretKey=%s\n", config.Debug, config.SecretKey)
+	if err := dbClient.Ping(ctx, nil); err != nil {
+		log.Fatal("mongo ping error:", err)
+	}
+
+	db := dbClient.Database("test")
+
+	if err := ensureIndexes(db); err != nil {
+		log.Fatal("failed to ensure indexes:", err)
+	}
+
 	return dbClient, db
+}
+
+func ensureIndexes(db *mongo.Database) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	_, err := db.Collection("user").Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "username", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Collection("follower").Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{
+			Keys:    bson.D{{Key: "who_id", Value: 1}, {Key: "whom_id", Value: 1}},
+			Options: options.Index().SetUnique(true),
+		},
+		{
+			Keys: bson.D{{Key: "who_id", Value: 1}},
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Collection("message").Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{
+			Keys: bson.D{{Key: "flagged", Value: 1}, {Key: "pub_date", Value: -1}},
+		},
+		{
+			Keys: bson.D{{Key: "author_id", Value: 1}, {Key: "flagged", Value: 1}, {Key: "pub_date", Value: -1}},
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
