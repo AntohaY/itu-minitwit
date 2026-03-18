@@ -1,10 +1,26 @@
 {{define "title"}}Page Not Found{{end}}
 
 {{define "content"}}
-<h2>404 - Page Not Found</h2>
-<div class="twitbox">
-    <p>Oops! We couldn't find the page you were looking for.</p>
-    <p><a href="/">Click here to return to the public timeline.</a></p>
-    <img class="shrek-animation" src="/static/shrek.jpg" alt="MiniTwit Logo" width="auto" height="auto" style="max-width: 100%">
+<div class="row justify-content-center text-center py-4">
+    <div class="col-md-8 col-lg-6">
+
+        <h1 class="display-1 fw-bold text-secondary mb-2">404</h1>
+        <h2 class="h3 mb-4 text-dark">Page Not Found</h2>
+
+        <p class="lead text-muted mb-4">
+            Oops! We couldn't find the page you were looking for.
+        </p>
+
+        <div class="mb-5">
+            <img class="shrek-animation img-fluid rounded shadow-sm" src="/static/shrek.jpg" alt="Page Not Found" style="max-height: 400px; object-fit: cover;">
+        </div>
+
+        <div>
+            <a href="/" class="btn btn-primary btn-lg fw-semibold px-4 shadow-sm">
+                Return to Public Timeline
+            </a>
+        </div>
+
+    </div>
 </div>
 {{end}}

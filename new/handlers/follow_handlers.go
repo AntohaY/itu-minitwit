@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"time"
 
@@ -11,117 +10,126 @@ import (
 
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // FollowUser handles following another user
 func FollowUser(w http.ResponseWriter, r *http.Request) {
 	currentUser := r.Context().Value("user")
 	if currentUser == nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized) // abort(401)
-		app.LogFollowError("Unauthorized user (user not found) tried to follow another user or DB problem")
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		app.LogFollowError("Unauthorized user tried to follow another user")
 		return
 	}
+
 	user := currentUser.(User)
 	username := mux.Vars(r)["username"]
-	log.Println("we reded username: " + username)
 
-	// whom_id = get_user_id(username)
 	var profileUser User
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	err := app.DB.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&profileUser)
 	if err != nil {
-		http.Error(w, "User not found", http.StatusNotFound)
 		if err == context.DeadlineExceeded {
-			app.LogFollowError("DB Timeout: FindOne took more than 5s for user")
+			app.LogFollowError("DB timeout while looking up user " + username)
 		} else {
-			app.LogFollowError("Not found: we couldnt follow some user because he/she doesnt exsit")
+			app.LogFollowError("Could not find user to follow: " + username)
 		}
+		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 
 	if user.ID == profileUser.ID {
-		app.LogFollowError("Logic Error: User (Some user) tried to follow themselves")
+		app.LogFollowError("User tried to follow themselves: " + username)
 		http.Redirect(w, r, "/user/"+username, http.StatusSeeOther)
 		return
 	}
 
-	whomID := profileUser.ID
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	_, insertErr := app.DB.Collection("follower").InsertOne(ctx, bson.M{
 		"who_id":  user.ID,
-		"whom_id": whomID,
+		"whom_id": profileUser.ID,
 	})
 	if insertErr != nil {
-		app.LogFollowError("DB Error: InsertOne failed for following (some user)")
+		if mongo.IsDuplicateKeyError(insertErr) {
+			session, cookiesErr := app.Store.Get(r, "minitwit-session")
+			if cookiesErr == nil {
+				session.AddFlash("You are already following \"" + username + "\"")
+				_ = session.Save(r, w)
+			}
+			http.Redirect(w, r, "/user/"+username, http.StatusSeeOther)
+			return
+		}
+
+		app.LogFollowError("DB error while following " + username + ": " + insertErr.Error())
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	// g.db.commit() - MongoDB auto-commits
-	session, cookies_error := app.Store.Get(r, "minitwit-session")
-	if cookies_error != nil {
-		app.LogFollowError("error on cookies (flash)")
+	session, cookiesErr := app.Store.Get(r, "minitwit-session")
+	if cookiesErr != nil {
+		app.LogFollowError("Session error while saving follow flash for " + username)
 	} else {
 		session.AddFlash("You are now following \"" + username + "\"")
-		session.Save(r, w)
+		_ = session.Save(r, w)
 	}
+
 	http.Redirect(w, r, "/user/"+username, http.StatusSeeOther)
 }
 
 // UnfollowUser handles unfollowing another user
 func UnfollowUser(w http.ResponseWriter, r *http.Request) {
-	// 1. Auth Check
 	currentUser := r.Context().Value("user")
 	if currentUser == nil {
-		app.LogFollowError("Unauthorized: Someone tried to unfollow without login")
+		app.LogFollowError("Unauthorized user tried to unfollow without login")
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+
 	user := currentUser.(User)
 	username := mux.Vars(r)["username"]
 
-	// 2. Find the user to unfollow
 	var profileUser User
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel() // Ensures the timer is stopped when function returns
+	defer cancel()
 
 	err := app.DB.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&profileUser)
 	if err != nil {
 		if err == context.DeadlineExceeded {
-			app.LogFollowError("DB Timeout: FindOne took more than 5s for user (some user)")
+			app.LogFollowError("DB timeout while looking up user to unfollow: " + username)
 		} else {
-			app.LogFollowError("Not Found: Could not unfollow (some user) because they do not exist")
+			app.LogFollowError("Could not find user to unfollow: " + username)
 		}
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 
-	// 3. Delete the relationship
-	// Re-initializing context/cancel for the second DB operation
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, deleteErr := app.DB.Collection("follower").DeleteOne(ctx, bson.M{
+	res, deleteErr := app.DB.Collection("follower").DeleteOne(ctx, bson.M{
 		"who_id":  user.ID,
 		"whom_id": profileUser.ID,
 	})
-
 	if deleteErr != nil {
-		app.LogFollowError("DB Error: DeleteOne failed for unfollowing " + username)
+		app.LogFollowError("DB error while unfollowing " + username + ": " + deleteErr.Error())
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return // Prevents redirecting if the deletion failed
+		return
 	}
 
-	// 4. Handle Flash Messages and Redirect
-	session, cookies_error := app.Store.Get(r, "minitwit-session")
-	if cookies_error != nil {
-		app.LogFollowError("Session Error: Failed to get session for unfollow flash")
+	session, cookiesErr := app.Store.Get(r, "minitwit-session")
+	if cookiesErr != nil {
+		app.LogFollowError("Session error while saving unfollow flash for " + username)
 	} else {
-		session.AddFlash("You are no longer following \"" + username + "\"")
-		session.Save(r, w)
+		if res.DeletedCount == 0 {
+			session.AddFlash("You were not following \"" + username + "\"")
+		} else {
+			session.AddFlash("You are no longer following \"" + username + "\"")
+		}
+		_ = session.Save(r, w)
 	}
 
 	http.Redirect(w, r, "/user/"+username, http.StatusSeeOther)

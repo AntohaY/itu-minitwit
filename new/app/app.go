@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -361,6 +362,46 @@ func CalculateNextPage(totalMessages int64, page int) (int, int) {
 	}
 
 	return nextPage, prevPage
+}
+
+func GetPaginationInfo(totalItems int64, currentPage int, perPage int, maxVisible int) (totalPages, prevPage, nextPage int, visiblePages []int) {
+	totalPages = int(math.Ceil(float64(totalItems) / float64(perPage)))
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	prevPage = currentPage - 1
+	if prevPage < 1 {
+		prevPage = -1
+	}
+
+	nextPage = currentPage + 1
+	if nextPage > totalPages {
+		nextPage = -1
+	}
+
+	// Calculate sliding window for visible pages
+	startPage := currentPage - maxVisible/2
+	endPage := currentPage + maxVisible/2
+
+	if startPage < 1 {
+		endPage += (1 - startPage)
+		startPage = 1
+	}
+
+	if endPage > totalPages {
+		startPage -= (endPage - totalPages)
+		if startPage < 1 {
+			startPage = 1
+		}
+		endPage = totalPages
+	}
+
+	for i := startPage; i <= endPage; i++ {
+		visiblePages = append(visiblePages, i)
+	}
+
+	return totalPages, prevPage, nextPage, visiblePages
 }
 
 // CountFollowedMessages counts the total messages from a user and those they follow

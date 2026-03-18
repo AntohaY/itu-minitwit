@@ -1,16 +1,37 @@
 {{define "content"}}
-      <h2>Sign Up</h2>
-      <form action="/register" method="post">
-        <dl>
-          <dt>Username:</dt>
-          <dd><input type="text" name="username" size="30"></dd>
-          <dt>E-Mail:</dt>
-          <dd><input type="text" name="email" size="30"></dd>
-          <dt>Password:</dt>
-          <dd><input type="password" name="password" size="30"></dd>
-          <dt>Password <small>(repeat)</small>:</dt>
-          <dd><input type="password" name="password2" size="30"></dd>
-        </dl>
-        <div class="actions"><input type="submit" value="Sign Up"></div>
-      </form>
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <h2 class="mb-4 text-center">Sign Up</h2>
+
+        <form action="/register" method="post">
+
+            <div class="mb-3">
+                <label for="username" class="form-label fw-bold">Username:</label>
+                <input type="text" id="username" name="username" class="form-control" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="email" class="form-label fw-bold">E-Mail:</label>
+                <input type="email" id="email" name="email" class="form-control" required>
+            </div>
+
+            <div class="mb-3">
+                <label for="password" class="form-label fw-bold">Password:</label>
+                <input type="password" id="password" name="password" class="form-control" required>
+            </div>
+
+            <div class="mb-4">
+                <label for="password2" class="form-label fw-bold">
+                    Password <small class="text-muted fw-normal">(repeat)</small>:
+                </label>
+                <input type="password" id="password2" name="password2" class="form-control" required>
+            </div>
+
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary btn-lg fw-semibold">Sign Up</button>
+            </div>
+
+        </form>
+    </div>
+</div>
 {{end}}
