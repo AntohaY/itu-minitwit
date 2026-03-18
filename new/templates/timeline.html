@@ -9,69 +9,98 @@ My Timeline
 {{end}}
 
 {{define "content"}}
-<h2>{{template "title" .}}</h2>
+<h2 class="mb-4 pb-2 border-bottom">{{template "title" .}}</h2>
 
 {{if .CurrentUser}}
 {{if eq .PageID "user"}}
-<div class="followstatus">
-  <h1>SHREEEEEEEK</h1>
-  {{if eq .CurrentUser.ID .ProfileUser.ID}}
-  This is you!
-  {{else if .IsFollowing}}
-  You are currently following this user.
-  <a class="unfollow" href="/user/unfollow/{{.ProfileUser.Username}}">Unfollow user</a>.
-  {{else}}
-  You are not yet following this user.
-  <a class="follow" href="/user/follow/{{.ProfileUser.Username}}">Follow user</a>.
-  {{end}}
+<div class="alert alert-secondary d-flex justify-content-between align-items-center mb-4 shadow-sm">
+  <div>
+    <h4 class="alert-heading mb-1">SHREEEEEEEK</h4>
+    {{if eq .CurrentUser.ID .ProfileUser.ID}}
+    <span class="text-muted">This is you!</span>
+    {{else if .IsFollowing}}
+    <span>You are currently following this user.</span>
+    {{else}}
+    <span>You are not yet following this user.</span>
+    {{end}}
+  </div>
+  <div>
+    {{if eq .CurrentUser.ID .ProfileUser.ID}}
+    {{else if .IsFollowing}}
+    <a class="btn btn-outline-danger btn-sm" href="/user/unfollow/{{.ProfileUser.Username}}">Unfollow user</a>
+    {{else}}
+    <a class="btn btn-primary btn-sm" href="/user/follow/{{.ProfileUser.Username}}">Follow user</a>
+    {{end}}
+  </div>
 </div>
+
 {{else if or (eq .PageID "personal") (eq .PageID "public")}}
-<div class="twitbox">
-  <h3>What's on your mind {{.CurrentUser.Username}}?</h3>
-  <form action="/add_message" method="post">
-    <p>
-      <input type="text" name="text" size="60">
-      <input type="submit" value="Share">
-    </p>
-  </form>
+<div class="card mb-4 shadow-sm border-primary border-opacity-25">
+  <div class="card-body bg-light">
+    <h5 class="card-title mb-3">What's on your mind, {{.CurrentUser.Username}}?</h5>
+    <form action="/add_message" method="post" class="d-flex gap-2">
+      <input type="text" name="text" class="form-control" placeholder="Share something..." required>
+      <button type="submit" class="btn btn-primary px-4 fw-semibold">Share</button>
+    </form>
+  </div>
 </div>
 {{end}}
-{{end}} <ul class="messages">
+{{end}}
+
+<div class="list-group mb-4 shadow-sm">
   {{range .Messages}}
-  <li>
-    <img src="{{ .Username | gravatar }}" width="48" height="48" class="gravatar" style="float: left; margin-right: 15px;">
-    <p>
-      <strong><a href="/user/{{.Username}}">{{.Username}}</a></strong>
-      {{.Text}}
-      <small>&mdash; {{.PubDate | formatDate}}</small>
-    </p>
-  </li>
+  <div class="list-group-item list-group-item-action d-flex p-3 align-items-start">
+    <img src="{{ .Username | gravatar }}" width="48" height="48" class="rounded shadow-sm me-3" alt="avatar">
+    <div class="w-100">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <strong><a href="/user/{{.Username}}" class="text-decoration-none">{{.Username}}</a></strong>
+        <small class="text-muted">{{.PubDate | formatDate}}</small>
+      </div>
+      <p class="mb-0 text-dark">{{.Text}}</p>
+    </div>
+  </div>
   {{else}}
-  <li><em>There's no message so far.</em></li>
-  {{end}}
-</ul>
-
-<div class="pagination">
-  {{if ne .PrevPage -1}}
-  {{if eq .PageID "public"}}
-  <a href="/?page={{.PrevPage}}" class="prev">&lt;&lt; Previous</a>
-  {{else if eq .PageID "personal"}}
-  <a href="/timeline?page={{.PrevPage}}" class="prev">&lt;&lt; Previous</a>
-  {{else if eq .PageID "user"}}
-  <a href="/user/{{.ProfileUser.Username}}?page={{.PrevPage}}" class="prev">&lt;&lt; Previous</a>
-  {{end}}
-  {{end}}
-
-  <span class="page-info">Page {{.Page}}</span>
-
-  {{if ne .NextPage -1}}
-  {{if eq .PageID "public"}}
-  <a href="/?page={{.NextPage}}" class="next">Next >></a>
-  {{else if eq .PageID "personal"}}
-  <a href="/timeline?page={{.NextPage}}" class="next">Next >></a>
-  {{else if eq .PageID "user"}}
-  <a href="/user/{{.ProfileUser.Username}}?page={{.NextPage}}" class="next">Next >></a>
-  {{end}}
+  <div class="list-group-item p-4 text-center text-muted">
+    <em>There's no message so far.</em>
+  </div>
   {{end}}
 </div>
+
+{{if gt .TotalPages 1}}
+<nav aria-label="Timeline pagination" class="mt-4">
+  <ul class="pagination justify-content-center">
+
+    <li class="page-item {{if eq .Page 1}}disabled{{end}}">
+      <a class="page-link" href="?page=1" aria-label="First">
+        <span aria-hidden="true">&laquo;&laquo;</span>
+      </a>
+    </li>
+
+    <li class="page-item {{if eq .PrevPage -1}}disabled{{end}}">
+      <a class="page-link" href="?page={{if ne .PrevPage -1}}{{.PrevPage}}{{else}}1{{end}}" aria-label="Previous">
+        <span aria-hidden="true">&laquo;</span>
+      </a>
+    </li>
+
+    {{range .VisiblePages}}
+    <li class="page-item {{if eq . $.Page}}active{{end}}">
+      <a class="page-link" href="?page={{.}}">{{.}}</a>
+    </li>
+    {{end}}
+
+    <li class="page-item {{if eq .NextPage -1}}disabled{{end}}">
+      <a class="page-link" href="?page={{if ne .NextPage -1}}{{.NextPage}}{{else}}{{.TotalPages}}{{end}}" aria-label="Next">
+        <span aria-hidden="true">&raquo;</span>
+      </a>
+    </li>
+
+    <li class="page-item {{if eq .Page .TotalPages}}disabled{{end}}">
+      <a class="page-link" href="?page={{.TotalPages}}" aria-label="Last">
+        <span aria-hidden="true">&raquo;&raquo;</span>
+      </a>
+    </li>
+
+  </ul>
+</nav>
+{{end}}
 {{end}}

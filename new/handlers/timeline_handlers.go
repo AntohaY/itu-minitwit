@@ -44,18 +44,20 @@ func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nextPage, prevPage := app.CalculateNextPage(totalMessages, page)
+	totalPages, prevPage, nextPage, visiblePages := app.GetPaginationInfo(totalMessages, page, app.PER_PAGE, 5)
 
 	data := TimelineUserData{
-		PageTitle:   "Public Timeline",
-		PageID:      "public",
-		Messages:    msgs,
-		CurrentUser: currUser,
-		ProfileUser: nil,
-		Flashes:     GetFlash(w, r),
-		Page:        page,
-		NextPage:    nextPage,
-		PrevPage:    prevPage,
+		PageTitle:    "Public Timeline",
+		PageID:       "public",
+		Messages:     msgs,
+		CurrentUser:  currUser,
+		ProfileUser:  nil,
+		Flashes:      GetFlash(w, r),
+		Page:         page,
+		NextPage:     nextPage,
+		PrevPage:     prevPage,
+		TotalPages:   totalPages,
+		VisiblePages: visiblePages,
 	}
 
 	app.RenderTemplate(w, "timeline.html", data)
@@ -88,18 +90,20 @@ func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nextPage, prevPage := app.CalculateNextPage(totalMessages, page)
+	totalPages, prevPage, nextPage, visiblePages := app.GetPaginationInfo(totalMessages, page, app.PER_PAGE, 5)
 
 	data := TimelineUserData{
-		PageTitle:   "My Timeline",
-		PageID:      "personal",
-		Messages:    msgs,
-		CurrentUser: currUser,
-		ProfileUser: currUser,
-		Page:        page,
-		NextPage:    nextPage,
-		PrevPage:    prevPage,
-		Flashes:     GetFlash(w, r),
+		PageTitle:    "My Timeline",
+		PageID:       "personal",
+		Messages:     msgs,
+		CurrentUser:  currUser,
+		ProfileUser:  currUser,
+		Page:         page,
+		NextPage:     nextPage,
+		PrevPage:     prevPage,
+		Flashes:      GetFlash(w, r),
+		TotalPages:   totalPages,
+		VisiblePages: visiblePages,
 	}
 
 	app.RenderTemplate(w, "timeline.html", data)
@@ -184,19 +188,21 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		messages = append(messages, msg)
 	}
 
-	nextPage, prevPage := app.CalculateNextPage(totalMessages, page)
+	totalPages, prevPage, nextPage, visiblePages := app.GetPaginationInfo(totalMessages, page, app.PER_PAGE, 5)
 
 	data := TimelineUserData{
-		PageTitle:   profileUser.Username + "'s Timeline",
-		PageID:      "user",
-		Messages:    messages,
-		ProfileUser: &profileUser,
-		CurrentUser: currUser,
-		IsFollowing: followed,
-		Flashes:     GetFlash(w, r),
-		Page:        page,
-		NextPage:    nextPage,
-		PrevPage:    prevPage,
+		PageTitle:    profileUser.Username + "'s Timeline",
+		PageID:       "user",
+		Messages:     messages,
+		ProfileUser:  &profileUser,
+		CurrentUser:  currUser,
+		IsFollowing:  followed,
+		Flashes:      GetFlash(w, r),
+		Page:         page,
+		NextPage:     nextPage,
+		PrevPage:     prevPage,
+		TotalPages:   totalPages,
+		VisiblePages: visiblePages,
 	}
 
 	app.RenderTemplate(w, "timeline.html", data)
