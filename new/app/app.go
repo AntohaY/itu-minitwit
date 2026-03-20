@@ -272,9 +272,15 @@ func GetFollowedMessages(userID primitive.ObjectID, limit int, skip int) ([]Mess
 	return messages, nil
 }
 
+const logDir = "/app/logs"
+
 func LoadPreviousErrors() {
-	// 1. Open the tracker file
-	file, err := os.OpenFile("errors_tracker.log", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	// Ensure the logs directory exists before doing anything
+	os.MkdirAll(logDir, os.ModePerm)
+
+	// Update the path
+	filePath := logDir + "/errors_tracker.log"
+	file, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
 		return
 	}
@@ -283,22 +289,20 @@ func LoadPreviousErrors() {
 	LogMutex.Lock()
 	defer LogMutex.Unlock()
 
-	scanner := bufio.NewScanner(file) //read the file
+	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.HasPrefix(line, "- ") {
-			// Your format is: "- <Error Message>: <Number> times"
-
-			lastColonIdx := strings.LastIndex(line, ":") //LastIndex is parsing from the right side, it finds the number in the end of line
+			lastColonIdx := strings.LastIndex(line, ":")
 			if lastColonIdx == -1 {
 				continue
 			}
 
-			msg := line[2:lastColonIdx]                        // Extract the message text (stripping the "- " from the front)
-			numStr := strings.TrimSpace(line[lastColonIdx+1:]) // Extract the number (stripping the " times" from the end)
+			msg := line[2:lastColonIdx]
+			numStr := strings.TrimSpace(line[lastColonIdx+1:])
 			numStr = strings.TrimSuffix(numStr, " times")
 
-			count, err := strconv.Atoi(numStr) // Convert the text number back to an integer
+			count, err := strconv.Atoi(numStr)
 			if err == nil {
 				ErrorCounts[msg] = count
 			}
@@ -307,6 +311,9 @@ func LoadPreviousErrors() {
 }
 
 func LogFollowError(errorMessage string) {
+	// Ensure the logs directory exists
+	os.MkdirAll(logDir, os.ModePerm)
+
 	LogMutex.Lock()
 	defer LogMutex.Unlock()
 
@@ -315,17 +322,17 @@ func LogFollowError(errorMessage string) {
 	entry := fmt.Sprintf("[%s] %s", timestamp, errorMessage)
 	ErrorLogs = append(ErrorLogs, entry)
 
-	// --- FILE 1: THE PERMANENT LOG (Nothing is ever erased) ---
-	// We use O_APPEND and NO O_TRUNC here
-	fHistory, err := os.OpenFile("errors_history.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	// --- FILE 1: THE PERMANENT LOG ---
+	historyPath := logDir + "/errors_history.log"
+	fHistory, err := os.OpenFile(historyPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err == nil {
 		fmt.Fprintln(fHistory, entry)
 		fHistory.Close()
 	}
 
-	// --- FILE 2: THE DASHBOARD (Rewritten every time for easy reading) ---
-	// We keep O_TRUNC here to keep the counters at the top
-	fDash, err := os.OpenFile("errors_tracker.log", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	// --- FILE 2: THE DASHBOARD ---
+	trackerPath := logDir + "/errors_tracker.log"
+	fDash, err := os.OpenFile(trackerPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return
 	}
