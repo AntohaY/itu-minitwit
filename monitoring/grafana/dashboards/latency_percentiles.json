@@ -76,8 +76,8 @@
             "uid": "ituminitwitprometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum by (le, method) (rate(minitwit_http_request_duration_seconds_bucket[5m]))) * 1000",
-          "legendFormat": "{{method}} - P50",
+          "expr": "histogram_quantile(0.50, sum by (le, method, path) (rate(minitwit_http_request_duration_seconds_bucket[5m]))) * 1000",
+          "legendFormat": "{{method}} {{path}} - P50",
           "range": true,
           "refId": "A"
         }
@@ -140,8 +140,8 @@
             "uid": "ituminitwitprometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le, method) (rate(minitwit_http_request_duration_seconds_bucket[5m]))) * 1000",
-          "legendFormat": "{{method}} - P95",
+          "expr": "histogram_quantile(0.95, sum by (le, method, path) (rate(minitwit_http_request_duration_seconds_bucket[5m]))) * 1000",
+          "legendFormat": "{{method}} {{path}} - P95",
           "range": true,
           "refId": "A"
         }
@@ -204,8 +204,8 @@
             "uid": "ituminitwitprometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum by (le, method) (rate(minitwit_http_request_duration_seconds_bucket[5m]))) * 1000",
-          "legendFormat": "{{method}} - P99",
+          "expr": "histogram_quantile(0.99, sum by (le, method, path) (rate(minitwit_http_request_duration_seconds_bucket[5m]))) * 1000",
+          "legendFormat": "{{method}} {{path}} - P99",
           "range": true,
           "refId": "A"
         }
