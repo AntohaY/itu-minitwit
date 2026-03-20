@@ -16,11 +16,43 @@ __pycache__/
 *.pyd
 
 # --------------------
+# Go build artifacts
+# --------------------
+bin/
+pkg/
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.o
+*.test
+*.out
+coverage.out
+.coverprofile
+
+# --------------------
+# Go runtime/temp files
+# --------------------
+tmp/
+new/tmp/
+new/minitwit
+flag_tool
+
+# --------------------
 # Flask / app specific
 # --------------------
 instance/
 .webassets-cache
 *.log
+errors_history.log
+errors_tracker.log
+
+# --------------------
+# Local DB/runtime files
+# --------------------
+*.db
+itu-minitwit
 
 # --------------------
 # Environment variables

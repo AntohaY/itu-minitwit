@@ -75,8 +75,8 @@
             "uid": "ituminitwitprometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (method, status) (rate(minitwit_http_responses_total[5m]))",
-          "legendFormat": "{{method}} - {{status}}",
+          "expr": "sum by (method, status, path) (rate(minitwit_http_responses_total[5m]))",
+          "legendFormat": "{{method}} {{path}} - {{status}}",
           "range": true,
           "refId": "A"
         }
@@ -213,8 +213,8 @@
             "uid": "ituminitwitprometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le, method, status) (rate(minitwit_http_request_duration_seconds_bucket[5m])))",
-          "legendFormat": "{{method}} - {{status}}",
+          "expr": "histogram_quantile(0.95, sum by (le, method, status, path) (rate(minitwit_http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{method}} {{path}} - {{status}}",
           "range": true,
           "refId": "A"
         }
