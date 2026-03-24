@@ -1,33 +1,30 @@
 services:
-  dbserver:
-    image: ${DOCKER_USERNAME}/dbminitwitimage:latest
-    restart: unless-stopped
-    environment:
-      - MONGO_INITDB_DATABASE=test
-    networks:
-      - minitwit-network
-    volumes:
-      - minitwit_cloud_data:/data/db
-    healthcheck:
-      test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')" ]
-      interval: 60s
-      timeout: 10s
-      retries: 5
-      start_period: 90s
+#  dbserver:
+#    image: ${DOCKER_USERNAME}/dbminitwitimage:latest
+#    restart: unless-stopped
+#    environment:
+##      - MONGO_INITDB_DATABASE=test
+#      - MONGO_URI=mongodb+srv://${DIGITAL_OCEAN_DATABASE_USERNAME}:${DIGITAL_OCEAN_DATABASE_PWD}@minitwit-dbserver-1-77977c42.mongo.ondigitalocean.com/${DIGITAL_OCEAN_DATABASE_NAME}?tls=true&authSource=admin
+#    networks:
+#      - minitwit-network
+#    volumes:
+#      - minitwit_cloud_data:/data/db
+#    healthcheck:
+#      test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')" ]
+#      interval: 60s
+#      timeout: 10s
+#      retries: 5
+#      start_period: 90s
 
   webserver:
     image: ${DOCKER_USERNAME}/webminitwitimage:latest
     restart: unless-stopped
-    depends_on:
-      dbserver:
-        condition: service_healthy
     ports:
       - "80:8080"
     environment:
-      - MONGO_URI=mongodb://dbserver:27017
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
+      - MONGO_URI=${MONGO_URI}
+    volumes:
+      - webserver_logs:/app/logs
     networks:
       - minitwit-network
 
@@ -65,11 +62,8 @@ services:
 
   discordbot:
     image: ${DOCKER_USERNAME}/discordbotimage:latest
-    depends_on:
-      dbserver:
-        condition: service_healthy
     environment:
-      - MONGO_URI=mongodb://dbserver:27017
+      - MONGO_URI=${MONGO_URI}
       - DISCORD_TOKEN=${DISCORD_TOKEN}
     networks:
       - minitwit-network
@@ -83,3 +77,4 @@ volumes:
   minitwit_cloud_data:
   prometheus_cloud_data:
   grafana_cloud_data:
+  webserver_logs:

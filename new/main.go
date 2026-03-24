@@ -58,11 +58,11 @@ func main() {
 	)
 
 	app.LoadPreviousErrors()
-
+	mongoURI := os.Getenv("MONGO_URI")
 	app.Config = Configuration{
 		Debug:     true,
 		SecretKey: "development key",
-		MongoURI:  "mongodb://dbserver:27017",
+		MongoURI:  mongoURI,
 	}
 
 	if envKey := os.Getenv("SECRET_KEY"); envKey != "" {
