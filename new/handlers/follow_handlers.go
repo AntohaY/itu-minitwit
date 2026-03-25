@@ -32,16 +32,16 @@ func FollowUser(w http.ResponseWriter, r *http.Request) {
 	err := app.DB.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&profileUser)
 	if err != nil {
 		if err == context.DeadlineExceeded {
-			app.LogFollowError("DB timeout while looking up user " + username)
+			app.LogFollowError("DB timeout while looking up user to follow")
 		} else {
-			app.LogFollowError("Could not find user to follow: " + username)
+			app.LogFollowError("Could not find user to follow")
 		}
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
 
 	if user.ID == profileUser.ID {
-		app.LogFollowError("User tried to follow themselves: " + username)
+		app.LogFollowError("User tried to follow themselves")
 		http.Redirect(w, r, "/user/"+username, http.StatusSeeOther)
 		return
 	}
@@ -64,14 +64,14 @@ func FollowUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		app.LogFollowError("DB error while following " + username + ": " + insertErr.Error())
+		app.LogFollowError("DB error while following user")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
 	session, cookiesErr := app.Store.Get(r, "minitwit-session")
 	if cookiesErr != nil {
-		app.LogFollowError("Session error while saving follow flash for " + username)
+		app.LogFollowError("Session error while saving follow flash")
 	} else {
 		session.AddFlash("You are now following \"" + username + "\"")
 		_ = session.Save(r, w)
@@ -99,9 +99,9 @@ func UnfollowUser(w http.ResponseWriter, r *http.Request) {
 	err := app.DB.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&profileUser)
 	if err != nil {
 		if err == context.DeadlineExceeded {
-			app.LogFollowError("DB timeout while looking up user to unfollow: " + username)
+			app.LogFollowError("DB timeout while looking up user to unfollow")
 		} else {
-			app.LogFollowError("Could not find user to unfollow: " + username)
+			app.LogFollowError("Could not find user to unfollow")
 		}
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
@@ -115,14 +115,14 @@ func UnfollowUser(w http.ResponseWriter, r *http.Request) {
 		"whom_id": profileUser.ID,
 	})
 	if deleteErr != nil {
-		app.LogFollowError("DB error while unfollowing " + username + ": " + deleteErr.Error())
+		app.LogFollowError("DB error while unfollowing user")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
 	session, cookiesErr := app.Store.Get(r, "minitwit-session")
 	if cookiesErr != nil {
-		app.LogFollowError("Session error while saving unfollow flash for " + username)
+		app.LogFollowError("Session error while saving unfollow flash")
 	} else {
 		if res.DeletedCount == 0 {
 			session.AddFlash("You were not following \"" + username + "\"")

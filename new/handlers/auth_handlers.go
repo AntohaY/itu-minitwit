@@ -2,13 +2,14 @@ package handlers
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
 	"minitwit/app"
 	. "minitwit/helpers/flashes"
+	"minitwit/helpers/requestctx"
 	. "minitwit/types"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -20,6 +21,7 @@ import (
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	requestID := requestctx.RequestIDFromRequest(r)
 
 	user := r.Context().Value("user")
 	if user != nil {
@@ -65,7 +67,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if errMsg != "" {
-		log.Println("Registration error:", errMsg)
+		slog.Warn("registration validation failed", "reason", errMsg, "request_id", requestID)
 		data.Flashes = append(data.Flashes, errMsg)
 	}
 	app.RenderTemplate(w, "register.html", data)
@@ -75,6 +77,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	requestID := requestctx.RequestIDFromRequest(r)
 
 	user := r.Context().Value("user")
 	if user != nil {
@@ -94,20 +97,21 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		dberr := app.DB.Collection("user").FindOne(ctx, filter).Decode(&foundUser)
 		if dberr != nil {
 			if dberr == mongo.ErrNoDocuments {
-				log.Println("User not found:", username)
+				slog.Warn("login failed", "reason", "user_not_found", "request_id", requestID)
 				flashes = append(flashes, "Invalid username")
 			} else {
 				flashes = append(flashes, "Database error occurred")
-				log.Println("Database error:", dberr)
+				slog.Error("login database error", "error", dberr.Error(), "request_id", requestID)
 			}
 		} else {
 			if !app.CheckPasswordHash(password, foundUser.HashedPW) {
-				log.Println("Password doesn't match")
+				slog.Warn("login failed", "reason", "invalid_password", "request_id", requestID)
 				flashes = append(flashes, "Invalid password")
 			} else {
 				session, _ := app.Store.Get(r, "minitwit-session")
 				session.Values["user_id"] = foundUser.ID.Hex()
 				session.Save(r, w)
+				slog.Info("login successful", "request_id", requestID)
 				http.Redirect(w, r, "/", http.StatusFound)
 				return
 			}

@@ -2,12 +2,13 @@ package handlers
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"minitwit/app"
 	. "minitwit/helpers/flashes"
+	"minitwit/helpers/requestctx"
 	. "minitwit/types"
 
 	"github.com/gorilla/mux"
@@ -65,6 +66,7 @@ func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 
 func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	skip, page := app.GetPageAndSkip(r.URL.Query().Get("page"))
+	requestID := requestctx.RequestIDFromRequest(r)
 
 	var currUser *User
 	if u := r.Context().Value("user"); u != nil {
@@ -79,7 +81,7 @@ func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 
 	msgs, err := app.GetFollowedMessages(currUser.ID, app.PER_PAGE, skip)
 	if err != nil {
-		log.Printf("error fetching followed messages for user %s: %v", currUser.ID.Hex(), err)
+		slog.Error("failed to fetch followed messages", "error", err.Error(), "request_id", requestID)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}

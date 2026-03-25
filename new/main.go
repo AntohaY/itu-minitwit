@@ -21,33 +21,45 @@
 package main
 
 import (
-	"fmt" // replace print() in python
-	"log"
+	"log/slog"
 	"minitwit/api"
 	"minitwit/handlers"
 	"net/http" // built-in library which replace flask
 	"os"       // read environment variables (for example DB_IP)
+	"strings"
 	_ "time/tzdata"
+
+	"minitwit/app"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
-)
 
-import (
-	"minitwit/app"
 	. "minitwit/db_setup"
-	. "minitwit/middleware"
-	. "minitwit/types"
-)
 
-// Prometheus imports
-import (
+	. "minitwit/middleware"
+
+	. "minitwit/types"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// Prometheus imports
+
 func main() {
+	logLevel := &slog.LevelVar{}
+	logLevel.Set(slog.LevelInfo)
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("LOG_LEVEL"))) {
+	case "debug":
+		logLevel.Set(slog.LevelDebug)
+	case "warn", "warning":
+		logLevel.Set(slog.LevelWarn)
+	case "error":
+		logLevel.Set(slog.LevelError)
+	}
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})))
+
 	reg := prometheus.NewRegistry()
 
 	reg.MustRegister(
@@ -127,6 +139,9 @@ func main() {
 	protectedUI.HandleFunc("/user/unfollow/{username}", handlers.UnfollowUser).Methods("GET")
 	protectedUI.HandleFunc("/user/{username}", handlers.UserTimelineHandler).Methods("GET")
 	protectedUI.HandleFunc("/add_message", handlers.AddMessageHandler).Methods("POST")
-	fmt.Println("Server running on port 8080...")
-	log.Fatal(http.ListenAndServe(":8080", router))
+	slog.Info("server starting", "port", 8080)
+	if err := http.ListenAndServe(":8080", router); err != nil {
+		slog.Error("server stopped", "error", err.Error())
+		os.Exit(1)
+	}
 }

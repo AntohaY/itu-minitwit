@@ -7,10 +7,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"html/template"
-	"log"
+	"log/slog"
 	"math"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -107,14 +108,14 @@ func RenderTemplate(w http.ResponseWriter, tmplName string, data interface{}) {
 
 	t, err := t.ParseFiles("templates/layout.html", "templates/"+tmplName)
 	if err != nil {
-		log.Println("Parse Error:", err)
+		slog.Error("template parse error", "template", tmplName, "error", err.Error())
 		http.Error(w, "Internal Error", 500)
 		return
 	}
 
 	err = t.ExecuteTemplate(w, "base", data)
 	if err != nil {
-		log.Println("Exec Error:", err)
+		slog.Error("template exec error", "template", tmplName, "error", err.Error())
 		http.Error(w, "Internal Error", 500)
 	}
 }
@@ -311,15 +312,18 @@ func LoadPreviousErrors() {
 }
 
 func LogFollowError(errorMessage string) {
+	safeMessage := sanitizeLogMessage(errorMessage)
+	slog.Warn("application error event", "message", safeMessage)
+
 	// Ensure the logs directory exists
 	os.MkdirAll(logDir, os.ModePerm)
 
 	LogMutex.Lock()
 	defer LogMutex.Unlock()
 
-	ErrorCounts[errorMessage]++
+	ErrorCounts[safeMessage]++
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	entry := fmt.Sprintf("[%s] %s", timestamp, errorMessage)
+	entry := fmt.Sprintf("[%s] %s", timestamp, safeMessage)
 	ErrorLogs = append(ErrorLogs, entry)
 
 	// --- FILE 1: THE PERMANENT LOG ---
@@ -342,6 +346,23 @@ func LogFollowError(errorMessage string) {
 	for msg, count := range ErrorCounts {
 		fmt.Fprintf(fDash, "- %s: %d times\n", msg, count)
 	}
+}
+
+func sanitizeLogMessage(msg string) string {
+	if msg == "" {
+		return msg
+	}
+	patterns := []string{
+		`(?i)(password|token|secret|authorization|cookie)\s*[:=]\s*[^\s,;]+`,
+		`(?i)(mongodb(\+srv)?://)[^\s]+`,
+		`(?i)(email|username)\s*[:=]\s*[^\s,;]+`,
+	}
+	sanitized := msg
+	for _, p := range patterns {
+		re := regexp.MustCompile(p)
+		sanitized = re.ReplaceAllString(sanitized, "$1=[REDACTED]")
+	}
+	return sanitized
 }
 
 func GetPageAndSkip(pageStr string) (int, int) {
