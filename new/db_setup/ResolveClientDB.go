@@ -2,7 +2,7 @@ package db_setup
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	. "minitwit/types"
@@ -25,17 +25,20 @@ func ResolveClientDB(config Configuration) (*mongo.Client, *mongo.Database) {
 
 	dbClient, err := mongo.Connect(ctx, clientOpts)
 	if err != nil {
-		log.Fatal("mongo connect error:", err)
+		slog.Error("mongo connect error", "error", err.Error())
+		panic("mongo connect error")
 	}
 
 	if err := dbClient.Ping(ctx, nil); err != nil {
-		log.Fatal("mongo ping error:", err)
+		slog.Error("mongo ping error", "error", err.Error())
+		panic("mongo ping error")
 	}
 
 	db := dbClient.Database("test")
 
 	if err := ensureIndexes(db); err != nil {
-		log.Fatal("failed to ensure indexes:", err)
+		slog.Error("failed to ensure indexes", "error", err.Error())
+		panic("failed to ensure indexes")
 	}
 
 	return dbClient, db
