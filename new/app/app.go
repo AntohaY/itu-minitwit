@@ -9,9 +9,9 @@ import (
 	"html/template"
 	"log/slog"
 	"math"
+	"minitwit/helpers/logsanitize"
 	"net/http"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -312,7 +312,7 @@ func LoadPreviousErrors() {
 }
 
 func LogFollowError(errorMessage string) {
-	safeMessage := sanitizeLogMessage(errorMessage)
+	safeMessage := logsanitize.Message(errorMessage)
 	slog.Warn("application error event", "message", safeMessage)
 
 	// Ensure the logs directory exists
@@ -347,24 +347,6 @@ func LogFollowError(errorMessage string) {
 		fmt.Fprintf(fDash, "- %s: %d times\n", msg, count)
 	}
 }
-
-func sanitizeLogMessage(msg string) string {
-	if msg == "" {
-		return msg
-	}
-	patterns := []string{
-		`(?i)(password|token|secret|authorization|cookie)\s*[:=]\s*[^\s,;]+`,
-		`(?i)(mongodb(\+srv)?://)[^\s]+`,
-		`(?i)(email|username)\s*[:=]\s*[^\s,;]+`,
-	}
-	sanitized := msg
-	for _, p := range patterns {
-		re := regexp.MustCompile(p)
-		sanitized = re.ReplaceAllString(sanitized, "$1=[REDACTED]")
-	}
-	return sanitized
-}
-
 func GetPageAndSkip(pageStr string) (int, int) {
 	page := 1
 	if pageStr != "" {
