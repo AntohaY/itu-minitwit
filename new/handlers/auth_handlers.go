@@ -22,9 +22,11 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	requestID := requestctx.RequestIDFromRequest(r)
+	slog.Debug("register handler called", "method", r.Method, "request_id", requestID)
 
 	user := r.Context().Value("user")
 	if user != nil {
+		slog.Info("register skipped for authenticated user", "request_id", requestID)
 		SetFlash(w, "You are already logged in as "+user.(User).Username)
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
@@ -37,6 +39,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		email := r.FormValue("email")
 		password := r.FormValue("password")
 		password2 := r.FormValue("password2")
+		slog.Debug("register attempt", "username", username, "request_id", requestID)
 
 		if username == "" {
 			errMsg = "You have to enter a username"
@@ -55,7 +58,16 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 				PW:       password,
 				HashedPW: password,
 			}
-			app.DB.Collection("user").InsertOne(ctx, newUser)
+			if _, err := app.DB.Collection("user").InsertOne(ctx, newUser); err != nil {
+				slog.Error("registration database error", "error", err.Error(), "request_id", requestID)
+				data := TimelineUserData{
+					PageTitle: "Register",
+					Flashes:   []string{"Database error occurred"},
+				}
+				app.RenderTemplate(w, "register.html", data)
+				return
+			}
+			slog.Info("registration successful", "username", username, "request_id", requestID)
 			http.Redirect(w, r, "/login", http.StatusFound)
 			return
 		}
@@ -70,6 +82,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("registration validation failed", "reason", errMsg, "request_id", requestID)
 		data.Flashes = append(data.Flashes, errMsg)
 	}
+	slog.Debug("render register page", "request_id", requestID)
 	app.RenderTemplate(w, "register.html", data)
 }
 
@@ -78,9 +91,11 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	requestID := requestctx.RequestIDFromRequest(r)
+	slog.Debug("login handler called", "method", r.Method, "request_id", requestID)
 
 	user := r.Context().Value("user")
 	if user != nil {
+		slog.Info("login skipped for authenticated user", "request_id", requestID)
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
@@ -90,6 +105,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 		username := r.FormValue("username")
 		password := r.FormValue("password")
+		slog.Debug("login attempt", "username", username, "request_id", requestID)
 
 		var foundUser User
 		filter := bson.M{"username": username}
@@ -118,16 +134,23 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	slog.Debug("render login page", "request_id", requestID)
 	app.RenderTemplate(w, "login.html", nil)
 }
 
 // LogoutHandler handles user logout
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	requestID := requestctx.RequestIDFromRequest(r)
+	slog.Debug("logout handler called", "request_id", requestID)
 	session, _ := app.Store.Get(r, "minitwit-session")
 	session.AddFlash("You were logged out")
 	for k := range session.Values {
 		delete(session.Values, k)
 	}
-	session.Save(r, w)
+	if err := session.Save(r, w); err != nil {
+		slog.Error("logout session save error", "error", err.Error(), "request_id", requestID)
+	} else {
+		slog.Info("logout successful", "request_id", requestID)
+	}
 	http.Redirect(w, r, "/", http.StatusFound)
 }
