@@ -152,7 +152,7 @@
         "type": "prometheus",
         "uid": "ituminitwitprometheus"
       },
-      "description": "Overall error rate (4xx + 5xx) as percentage of total requests",
+      "description": "Error rate for the last 5 minutes",
       "fieldConfig": {
         "defaults": {
           "color": {
