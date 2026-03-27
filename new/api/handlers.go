@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -40,6 +41,13 @@ func NewAPI(db *mongo.Database) *APIHandler {
 	}
 }
 
+func requestIDFromRequest(r *http.Request) string {
+	if rid := strings.TrimSpace(r.Header.Get("X-Request-ID")); rid != "" {
+		return rid
+	}
+	return "-"
+}
+
 // updateLatest safely updates the global state
 func (a *APIHandler) updateLatest(r *http.Request) {
 	if latestStr := r.URL.Query().Get("latest"); latestStr != "" {
@@ -47,6 +55,7 @@ func (a *APIHandler) updateLatest(r *http.Request) {
 			a.LatestMutex.Lock()
 			a.LatestValue = parsed
 			a.LatestMutex.Unlock()
+			slog.Debug("api latest updated", "latest", parsed, "request_id", requestIDFromRequest(r))
 		}
 	}
 }
@@ -54,6 +63,8 @@ func (a *APIHandler) updateLatest(r *http.Request) {
 // AuthMiddleware enforces Simulator Auth
 func (a *APIHandler) AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		requestID := requestIDFromRequest(r)
+		slog.Debug("api auth middleware called", "path", r.URL.Path, "method", r.Method, "request_id", requestID)
 		a.updateLatest(r)
 
 		// Built-in Go helper to extract credentials
@@ -61,6 +72,7 @@ func (a *APIHandler) AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 		// Check if the credentials match "simulator" and "super_safe!"
 		if !ok || user != "simulator" || pass != "super_safe!" {
+			slog.Warn("api auth failed", "path", r.URL.Path, "method", r.Method, "request_id", requestID)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusForbidden)
 			json.NewEncoder(w).Encode(map[string]interface{}{
@@ -69,6 +81,7 @@ func (a *APIHandler) AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			})
 			return
 		}
+		slog.Debug("api auth passed", "path", r.URL.Path, "method", r.Method, "request_id", requestID)
 		next.ServeHTTP(w, r)
 	}
 }
@@ -76,16 +89,20 @@ func (a *APIHandler) AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 // --- ENDPOINTS ---
 
 func (a *APIHandler) GetLatestHandler(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromRequest(r)
 	a.LatestMutex.RLock()
 	val := a.LatestValue
 	a.LatestMutex.RUnlock()
+	slog.Debug("api get latest", "latest", val, "request_id", requestID)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]int{"latest": val})
 }
 
 func (a *APIHandler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromRequest(r)
 	a.updateLatest(r)
+	slog.Debug("api register called", "request_id", requestID)
 	w.Header().Set("Content-Type", "application/json")
 
 	var payload struct {
@@ -95,6 +112,7 @@ func (a *APIHandler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		slog.Warn("api register bad payload", "error", err.Error(), "request_id", requestID)
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]interface{}{"status": 400, "error_msg": "Bad Request"})
 		return
@@ -117,6 +135,7 @@ func (a *APIHandler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if errMsg != "" {
+		slog.Warn("api register validation failed", "reason", errMsg, "request_id", requestID)
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]interface{}{"status": 400, "error_msg": errMsg})
 		return
@@ -128,16 +147,24 @@ func (a *APIHandler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		PW:       payload.Pwd,
 		HashedPW: payload.Pwd,
 	}
-	a.DB.Collection("user").InsertOne(context.TODO(), newUser)
+	if _, err := a.DB.Collection("user").InsertOne(context.TODO(), newUser); err != nil {
+		slog.Error("api register insert failed", "error", err.Error(), "request_id", requestID)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{"status": 500, "error_msg": "Internal Server Error"})
+		return
+	}
+	slog.Info("api register successful", "username", payload.Username, "request_id", requestID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
 func (a *APIHandler) GetMessagesHandler(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromRequest(r)
 	w.Header().Set("Content-Type", "application/json")
 	limit := 100
 	if parsed, err := strconv.Atoi(r.URL.Query().Get("no")); err == nil {
 		limit = parsed
 	}
+	slog.Debug("api get messages called", "limit", limit, "request_id", requestID)
 
 	pipeline := mongo.Pipeline{
 		{{Key: "$match", Value: bson.D{{Key: "flagged", Value: false}}}},
@@ -152,7 +179,14 @@ func (a *APIHandler) GetMessagesHandler(w http.ResponseWriter, r *http.Request) 
 		{{Key: "$unwind", Value: "$author_info"}},
 	}
 
-	cursor, _ := a.DB.Collection("message").Aggregate(context.TODO(), pipeline)
+	cursor, err := a.DB.Collection("message").Aggregate(context.TODO(), pipeline)
+	if err != nil {
+		slog.Error("api get messages query failed", "error", err.Error(), "request_id", requestID)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{"status": 500, "error_msg": "Internal Server Error"})
+		return
+	}
+	defer cursor.Close(context.TODO())
 
 	type ApiMsg struct {
 		Content string `json:"content"`
@@ -175,19 +209,23 @@ func (a *APIHandler) GetMessagesHandler(w http.ResponseWriter, r *http.Request) 
 			response = append(response, ApiMsg{Content: result.Text, PubDate: t, User: result.Author.Username})
 		}
 	}
+	slog.Debug("api get messages response", "count", len(response), "request_id", requestID)
 	json.NewEncoder(w).Encode(response)
 }
 
 // UserMessagesHandler handles fetching and posting messages for a specific user.
 func (a *APIHandler) UserMessagesHandler(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromRequest(r)
 	w.Header().Set("Content-Type", "application/json")
 	vars := mux.Vars(r)
 	username := vars["username"]
+	slog.Debug("api user messages called", "method", r.Method, "username", username, "request_id", requestID)
 
 	// 1. Verify the user exists
 	var profileUser User
 	err := a.DB.Collection("user").FindOne(context.TODO(), bson.M{"username": username}).Decode(&profileUser)
 	if err != nil {
+		slog.Warn("api user messages profile not found", "username", username, "request_id", requestID)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -200,10 +238,16 @@ func (a *APIHandler) UserMessagesHandler(w http.ResponseWriter, r *http.Request)
 		}
 
 		opts := options.Find().SetSort(bson.M{"pub_date": -1}).SetLimit(int64(limit))
-		cursor, _ := a.DB.Collection("message").Find(context.TODO(), bson.M{
+		cursor, err := a.DB.Collection("message").Find(context.TODO(), bson.M{
 			"author_id": profileUser.ID,
 			"flagged":   false,
 		}, opts)
+		if err != nil {
+			slog.Error("api user messages query failed", "username", username, "error", err.Error(), "request_id", requestID)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		defer cursor.Close(context.TODO())
 
 		type ApiMsg struct {
 			Content string `json:"content"`
@@ -229,6 +273,7 @@ func (a *APIHandler) UserMessagesHandler(w http.ResponseWriter, r *http.Request)
 				})
 			}
 		}
+		slog.Debug("api user messages response", "username", username, "count", len(response), "request_id", requestID)
 		json.NewEncoder(w).Encode(response)
 
 	} else if r.Method == http.MethodPost {
@@ -237,6 +282,7 @@ func (a *APIHandler) UserMessagesHandler(w http.ResponseWriter, r *http.Request)
 			Content string `json:"content"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			slog.Warn("api user message bad payload", "username", username, "error", err.Error(), "request_id", requestID)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -247,20 +293,28 @@ func (a *APIHandler) UserMessagesHandler(w http.ResponseWriter, r *http.Request)
 			"pub_date":  time.Now().Unix(),
 			"flagged":   false,
 		}
-		a.DB.Collection("message").InsertOne(context.TODO(), doc)
+		if _, err := a.DB.Collection("message").InsertOne(context.TODO(), doc); err != nil {
+			slog.Error("api user message insert failed", "username", username, "error", err.Error(), "request_id", requestID)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		slog.Info("api user message created", "username", username, "text_length", len(payload.Content), "request_id", requestID)
 		w.WriteHeader(http.StatusNoContent) // 204 Success, No Content
 	}
 }
 
 // FollowsHandler manages fetching followers and handling follow/unfollow requests.
 func (a *APIHandler) FollowsHandler(w http.ResponseWriter, r *http.Request) {
+	requestID := requestIDFromRequest(r)
 	w.Header().Set("Content-Type", "application/json")
 	vars := mux.Vars(r)
 	username := vars["username"]
+	slog.Debug("api follows called", "method", r.Method, "username", username, "request_id", requestID)
 
 	var profileUser User
 	err := a.DB.Collection("user").FindOne(context.TODO(), bson.M{"username": username}).Decode(&profileUser)
 	if err != nil {
+		slog.Warn("api follows profile not found", "username", username, "request_id", requestID)
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
@@ -273,7 +327,13 @@ func (a *APIHandler) FollowsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		opts := options.Find().SetLimit(int64(limit))
-		cursor, _ := a.DB.Collection("follower").Find(context.TODO(), bson.M{"who_id": profileUser.ID}, opts)
+		cursor, err := a.DB.Collection("follower").Find(context.TODO(), bson.M{"who_id": profileUser.ID}, opts)
+		if err != nil {
+			slog.Error("api follows list query failed", "username", username, "error", err.Error(), "request_id", requestID)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		defer cursor.Close(context.TODO())
 
 		follows := []string{} // Initialize as empty slice
 		for cursor.Next(context.TODO()) {
@@ -288,12 +348,14 @@ func (a *APIHandler) FollowsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
+		slog.Debug("api follows list response", "username", username, "count", len(follows), "request_id", requestID)
 		json.NewEncoder(w).Encode(map[string]interface{}{"follows": follows})
 
 	} else if r.Method == http.MethodPost {
 		// POST: Follow or Unfollow
 		var payload map[string]string
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			slog.Warn("api follows bad payload", "username", username, "error", err.Error(), "request_id", requestID)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -302,11 +364,17 @@ func (a *APIHandler) FollowsHandler(w http.ResponseWriter, r *http.Request) {
 		if followTarget, ok := payload["follow"]; ok {
 			var target User
 			if a.DB.Collection("user").FindOne(context.TODO(), bson.M{"username": followTarget}).Decode(&target) == nil {
-				a.DB.Collection("follower").InsertOne(context.TODO(), bson.M{
+				if _, err := a.DB.Collection("follower").InsertOne(context.TODO(), bson.M{
 					"who_id":  profileUser.ID,
 					"whom_id": target.ID,
-				})
+				}); err != nil {
+					slog.Error("api follow insert failed", "username", username, "target", followTarget, "error", err.Error(), "request_id", requestID)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				slog.Info("api follow successful", "username", username, "target", followTarget, "request_id", requestID)
 			} else {
+				slog.Warn("api follow target not found", "username", username, "target", followTarget, "request_id", requestID)
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
@@ -314,16 +382,27 @@ func (a *APIHandler) FollowsHandler(w http.ResponseWriter, r *http.Request) {
 		} else if unfollowTarget, ok := payload["unfollow"]; ok {
 			var target User
 			if a.DB.Collection("user").FindOne(context.TODO(), bson.M{"username": unfollowTarget}).Decode(&target) == nil {
-				a.DB.Collection("follower").DeleteOne(context.TODO(), bson.M{
+				if _, err := a.DB.Collection("follower").DeleteOne(context.TODO(), bson.M{
 					"who_id":  profileUser.ID,
 					"whom_id": target.ID,
-				})
+				}); err != nil {
+					slog.Error("api unfollow delete failed", "username", username, "target", unfollowTarget, "error", err.Error(), "request_id", requestID)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				slog.Info("api unfollow successful", "username", username, "target", unfollowTarget, "request_id", requestID)
 			} else {
+				slog.Warn("api unfollow target not found", "username", username, "target", unfollowTarget, "request_id", requestID)
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
+		} else {
+			slog.Warn("api follows invalid action payload", "username", username, "request_id", requestID)
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 
+		slog.Debug("api follows mutation completed", "username", username, "request_id", requestID)
 		w.WriteHeader(http.StatusNoContent) // 204 Success, No Content
 	}
 }
