@@ -126,7 +126,8 @@ func main() {
 	router.HandleFunc("/latest", apiHandler.GetLatestHandler).Methods("GET")
 
 	// The "Headers" matcher ensures JSON requests go to the API, not UI
-	router.HandleFunc("/register", apiHandler.RegisterHandler).Methods("POST")
+	router.HandleFunc("/register", apiHandler.RegisterHandler).Methods("POST").
+		HeadersRegexp("Content-Type", "application/json.*")
 
 	// Wrapping the protected API endpoints with the API's specific Basic Auth middleware
 	router.HandleFunc("/msgs", apiHandler.AuthMiddleware(apiHandler.GetMessagesHandler)).Methods("GET")
