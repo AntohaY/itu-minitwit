@@ -30,6 +30,7 @@ services:
       dockerfile: ../docker/web/Dockerfile.dev
     volumes:
       - ./new:/app
+      - ./new/logs:/usr/src/app/logs
 #    dns:
 #      - 8.8.8.8
 #      - 8.8.4.4

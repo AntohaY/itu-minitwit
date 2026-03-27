@@ -31,7 +31,7 @@ services:
     environment:
       - MONGO_URI=${MONGO_URI}
     volumes:
-      - ./new/logs:usr/src/app/logs
+      - ./new/logs:/usr/src/app/logs
     networks:
       - minitwit-network
     logging: *syslog_logging
