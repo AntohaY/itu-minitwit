@@ -3,9 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,6 +20,18 @@ import (
 var db *mongo.Database
 
 func main() {
+	logLevel := &slog.LevelVar{}
+	logLevel.Set(slog.LevelInfo)
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("LOG_LEVEL"))) {
+	case "debug":
+		logLevel.Set(slog.LevelDebug)
+	case "warn", "warning":
+		logLevel.Set(slog.LevelWarn)
+	case "error":
+		logLevel.Set(slog.LevelError)
+	}
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})))
+
 	// 1. Connect to MongoDB
 	mongoURI := os.Getenv("MONGO_URI")
 	if mongoURI == "" {
@@ -31,49 +44,54 @@ func main() {
 
 	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
 	if err != nil {
-		log.Fatal("Error initializing MongoDB client: ", err)
+		slog.Error("failed to initialize MongoDB client", "error", err.Error())
+		os.Exit(1)
 	}
 
 	// CLEANUP: Ensure we close the DB connection when the bot shuts down
 	defer func() {
 		if err = client.Disconnect(context.Background()); err != nil {
-			log.Println("Error disconnecting from MongoDB:", err)
+			slog.Warn("error disconnecting MongoDB", "error", err.Error())
 		}
 	}()
 
 	err = client.Ping(ctx, readpref.Primary())
 	if err != nil {
-		log.Fatal("Could not ping MongoDB: ", err)
+		slog.Error("could not ping MongoDB", "error", err.Error())
+		os.Exit(1)
 	}
 
 	db = client.Database("test")
-	fmt.Println("Bot successfully connected and pinged MongoDB!")
+	slog.Info("bot connected to MongoDB")
 
 	token := os.Getenv("DISCORD_TOKEN")
 	if token == "" {
-		log.Fatal("DISCORD_TOKEN environment variable not set")
+		slog.Error("DISCORD_TOKEN environment variable not set")
+		os.Exit(1)
 	}
 
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
-		log.Fatal("Error creating Discord session: ", err)
+		slog.Error("failed to create Discord session", "error", err.Error())
+		os.Exit(1)
 	}
 
 	dg.AddHandler(messageCreate)
 
 	err = dg.Open()
 	if err != nil {
-		log.Fatal("Error opening Discord connection: ", err)
+		slog.Error("failed to open Discord connection", "error", err.Error())
+		os.Exit(1)
 	}
 
-	fmt.Println("Bot is now running. Press CTRL-C to exit.")
+	slog.Info("bot running")
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 
 	// Gracefully shut down the Discord session
 	dg.Close()
-	fmt.Println("Bot shutting down...")
+	slog.Info("bot shutting down")
 }
 
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
@@ -90,7 +108,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		count, err := collection.CountDocuments(reqCtx, bson.D{})
 		if err != nil {
 			s.ChannelMessageSend(m.ChannelID, "Sorry, I couldn't reach the database right now.")
-			log.Println("DB Count Error:", err)
+			slog.Error("failed counting users", "error", err.Error())
 			return
 		}
 

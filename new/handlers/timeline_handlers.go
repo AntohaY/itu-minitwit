@@ -2,12 +2,13 @@ package handlers
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"minitwit/app"
 	. "minitwit/helpers/flashes"
+	"minitwit/helpers/requestctx"
 	. "minitwit/types"
 
 	"github.com/gorilla/mux"
@@ -18,9 +19,12 @@ import (
 
 func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	skip, page := app.GetPageAndSkip(r.URL.Query().Get("page"))
+	requestID := requestctx.RequestIDFromRequest(r)
+	slog.Debug("public timeline handler called", "page", page, "skip", skip, "request_id", requestID)
 
 	msgs, err := app.QueryDatabaseForMessages(app.PER_PAGE, skip)
 	if err != nil {
+		slog.Error("public timeline messages query failed", "error", err.Error(), "request_id", requestID)
 		http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -40,6 +44,7 @@ func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 
 	totalMessages, err := app.DB.Collection("message").CountDocuments(ctx, filter)
 	if err != nil {
+		slog.Error("public timeline count failed", "error", err.Error(), "request_id", requestID)
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
@@ -60,11 +65,14 @@ func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		VisiblePages: visiblePages,
 	}
 
+	slog.Debug("public timeline render", "messages", len(msgs), "page", page, "request_id", requestID)
 	app.RenderTemplate(w, "timeline.html", data)
 }
 
 func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	skip, page := app.GetPageAndSkip(r.URL.Query().Get("page"))
+	requestID := requestctx.RequestIDFromRequest(r)
+	slog.Debug("personal timeline handler called", "page", page, "skip", skip, "request_id", requestID)
 
 	var currUser *User
 	if u := r.Context().Value("user"); u != nil {
@@ -73,19 +81,21 @@ func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if currUser == nil {
+		slog.Info("personal timeline redirect anonymous user", "request_id", requestID)
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 
 	msgs, err := app.GetFollowedMessages(currUser.ID, app.PER_PAGE, skip)
 	if err != nil {
-		log.Printf("error fetching followed messages for user %s: %v", currUser.ID.Hex(), err)
+		slog.Error("failed to fetch followed messages", "error", err.Error(), "request_id", requestID)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
 	totalMessages, err := app.CountFollowedMessages(currUser.ID)
 	if err != nil {
+		slog.Error("failed to count followed messages", "error", err.Error(), "request_id", requestID)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -106,14 +116,17 @@ func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		VisiblePages: visiblePages,
 	}
 
+	slog.Debug("personal timeline render", "messages", len(msgs), "page", page, "request_id", requestID)
 	app.RenderTemplate(w, "timeline.html", data)
 }
 
 func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	username := vars["username"]
+	requestID := requestctx.RequestIDFromRequest(r)
 
 	skip, page := app.GetPageAndSkip(r.URL.Query().Get("page"))
+	slog.Debug("user timeline handler called", "username", username, "page", page, "skip", skip, "request_id", requestID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -121,6 +134,7 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	var profileUser User
 	err := app.DB.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&profileUser)
 	if err != nil {
+		slog.Warn("user timeline profile not found", "username", username, "request_id", requestID)
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
@@ -155,12 +169,14 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 
 	totalMessages, err := app.DB.Collection("message").CountDocuments(ctx, filter)
 	if err != nil {
+		slog.Error("user timeline count failed", "username", username, "error", err.Error(), "request_id", requestID)
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
 	cursor, err := app.DB.Collection("message").Find(ctx, filter, opts)
 	if err != nil {
+		slog.Error("user timeline query failed", "username", username, "error", err.Error(), "request_id", requestID)
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
@@ -174,6 +190,7 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := cursor.All(ctx, &rawResults); err != nil {
+		slog.Error("user timeline decode failed", "username", username, "error", err.Error(), "request_id", requestID)
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
@@ -205,10 +222,13 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		VisiblePages: visiblePages,
 	}
 
+	slog.Debug("user timeline render", "username", username, "messages", len(messages), "page", page, "request_id", requestID)
 	app.RenderTemplate(w, "timeline.html", data)
 }
 
 func NotFoundHandler(w http.ResponseWriter, r *http.Request) {
+	requestID := requestctx.RequestIDFromRequest(r)
+	slog.Warn("not found handler called", "path", r.URL.Path, "request_id", requestID)
 	w.WriteHeader(http.StatusNotFound)
 
 	var currUser *User
@@ -222,5 +242,6 @@ func NotFoundHandler(w http.ResponseWriter, r *http.Request) {
 		CurrentUser: currUser,
 	}
 
+	slog.Debug("not found render", "request_id", requestID)
 	app.RenderTemplate(w, "404.html", data)
 }

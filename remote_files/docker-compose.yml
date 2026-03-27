@@ -1,3 +1,10 @@
+x-syslog-logging: &syslog_logging
+  driver: syslog
+  options:
+    syslog-address: ${SYSLOG_ADDRESS:-udp://127.0.0.1:5514}
+    tag: "{{.Name}}"
+    syslog-format: rfc5424micro
+
 services:
 #  dbserver:
 #    image: ${DOCKER_USERNAME}/dbminitwitimage:latest
@@ -27,6 +34,7 @@ services:
       - webserver_logs:/app/logs
     networks:
       - minitwit-network
+    logging: *syslog_logging
 
   # --- NEW MONITORING SERVICES ---
   prometheus:
@@ -43,6 +51,7 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
     restart: unless-stopped
+    logging: *syslog_logging
 
   grafana:
     image: grafana/grafana:latest
@@ -59,6 +68,7 @@ services:
       - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
       - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
     restart: unless-stopped
+    logging: *syslog_logging
 
   discordbot:
     image: ${DOCKER_USERNAME}/discordbotimage:latest
@@ -68,6 +78,24 @@ services:
     networks:
       - minitwit-network
     restart: unless-stopped
+    logging: *syslog_logging
+
+  central-rsyslog:
+    build:
+      context: ./monitoring/rsyslog
+      dockerfile: Dockerfile
+    container_name: central-rsyslog
+    restart: unless-stopped
+    environment:
+      - RSYSLOG_RETENTION_DAYS=7
+      - RSYSLOG_CLEANUP_INTERVAL_SECONDS=3600
+    ports:
+      - "5514:514/tcp"
+      - "5514:514/udp"
+    networks:
+      - minitwit-network
+    volumes:
+      - rsyslog_data:/var/log/remote
 
 networks:
   minitwit-network:
@@ -78,3 +106,4 @@ volumes:
   prometheus_cloud_data:
   grafana_cloud_data:
   webserver_logs:
+  rsyslog_data:

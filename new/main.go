@@ -21,33 +21,45 @@
 package main
 
 import (
-	"fmt" // replace print() in python
-	"log"
+	"log/slog"
 	"minitwit/api"
 	"minitwit/handlers"
 	"net/http" // built-in library which replace flask
 	"os"       // read environment variables (for example DB_IP)
+	"strings"
 	_ "time/tzdata"
+
+	"minitwit/app"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
-)
 
-import (
-	"minitwit/app"
 	. "minitwit/db_setup"
-	. "minitwit/middleware"
-	. "minitwit/types"
-)
 
-// Prometheus imports
-import (
+	. "minitwit/middleware"
+
+	. "minitwit/types"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+// Prometheus imports
+
 func main() {
+	logLevel := &slog.LevelVar{}
+	logLevel.Set(slog.LevelInfo)
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("LOG_LEVEL"))) {
+	case "debug":
+		logLevel.Set(slog.LevelDebug)
+	case "warn", "warning":
+		logLevel.Set(slog.LevelWarn)
+	case "error":
+		logLevel.Set(slog.LevelError)
+	}
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel})))
+
 	reg := prometheus.NewRegistry()
 
 	reg.MustRegister(
@@ -83,12 +95,27 @@ func main() {
 	app.DBClient, app.DB = ResolveClientDB(app.Config)
 	authMiddleware := AuthMiddleware(app.Store, app.DB)
 
-	router := mux.NewRouter()
+	router := mux.NewRouter().StrictSlash(true)
 
 	router.Use(MetricsMiddleware)
 	router.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 
-	router.NotFoundHandler = authMiddleware(http.HandlerFunc(handlers.NotFoundHandler))
+	router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 1. Detect the Simulator / API Request
+		isAPIRequest := r.Header.Get("Authorization") != "" ||
+			strings.Contains(r.Header.Get("Accept"), "application/json") ||
+			strings.Contains(r.Header.Get("Content-Type"), "application/json")
+
+		if isAPIRequest {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		// 2. Handle standard Web Browser UI requests
+		// Wrap the UI handler in the auth middleware dynamically so r.Context().Value("user") still works
+		uiNotFound := authMiddleware(http.HandlerFunc(handlers.NotFoundHandler))
+		uiNotFound.ServeHTTP(w, r)
+	})
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 
 	// ==========================================
@@ -99,7 +126,7 @@ func main() {
 	router.HandleFunc("/latest", apiHandler.GetLatestHandler).Methods("GET")
 
 	// The "Headers" matcher ensures JSON requests go to the API, not UI
-	router.HandleFunc("/register", apiHandler.RegisterHandler).Methods("POST").Headers("Content-Type", "application/json")
+	router.HandleFunc("/register", apiHandler.RegisterHandler).Methods("POST")
 
 	// Wrapping the protected API endpoints with the API's specific Basic Auth middleware
 	router.HandleFunc("/msgs", apiHandler.AuthMiddleware(apiHandler.GetMessagesHandler)).Methods("GET")
@@ -109,24 +136,23 @@ func main() {
 	// ==========================================
 	// 4. UI ROUTES (Web Browser)
 	// ==========================================
-	publicUI := router.PathPrefix("/").Subrouter()
-	publicUI.Use(BeforeAfterMiddleware)
-	publicUI.Use(authMiddleware)
+	uiRouter := router.PathPrefix("/").Subrouter()
+	uiRouter.Use(BeforeAfterMiddleware)
+	uiRouter.Use(authMiddleware)
 
-	publicUI.HandleFunc("/", handlers.PublicTimelineHandler).Methods("GET")
-	publicUI.HandleFunc("/login", handlers.LoginHandler)
-	publicUI.HandleFunc("/register", handlers.RegisterHandler)
+	uiRouter.HandleFunc("/", handlers.PublicTimelineHandler).Methods("GET")
+	uiRouter.HandleFunc("/login", handlers.LoginHandler)
+	uiRouter.HandleFunc("/register", handlers.RegisterHandler)
 
-	protectedUI := router.PathPrefix("/").Subrouter()
-	protectedUI.Use(BeforeAfterMiddleware)
-	protectedUI.Use(authMiddleware)
-
-	protectedUI.HandleFunc("/timeline", handlers.PersonalTimelineHandler).Methods("GET")
-	protectedUI.HandleFunc("/logout", handlers.LogoutHandler)
-	protectedUI.HandleFunc("/user/follow/{username}", handlers.FollowUser).Methods("GET")
-	protectedUI.HandleFunc("/user/unfollow/{username}", handlers.UnfollowUser).Methods("GET")
-	protectedUI.HandleFunc("/user/{username}", handlers.UserTimelineHandler).Methods("GET")
-	protectedUI.HandleFunc("/add_message", handlers.AddMessageHandler).Methods("POST")
-	fmt.Println("Server running on port 8080...")
-	log.Fatal(http.ListenAndServe(":8080", router))
+	uiRouter.HandleFunc("/timeline", handlers.PersonalTimelineHandler).Methods("GET")
+	uiRouter.HandleFunc("/logout", handlers.LogoutHandler)
+	uiRouter.HandleFunc("/user/follow/{username}", handlers.FollowUser).Methods("GET")
+	uiRouter.HandleFunc("/user/unfollow/{username}", handlers.UnfollowUser).Methods("GET")
+	uiRouter.HandleFunc("/user/{username}", handlers.UserTimelineHandler).Methods("GET")
+	uiRouter.HandleFunc("/add_message", handlers.AddMessageHandler).Methods("POST")
+	slog.Info("server starting", "port", 8080)
+	if err := http.ListenAndServe(":8080", router); err != nil {
+		slog.Error("server stopped", "error", err.Error())
+		os.Exit(1)
+	}
 }
