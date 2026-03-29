@@ -21,10 +21,10 @@ Vagrant.configure("2") do |config|
 
     server.vm.hostname = "minitwit-p"
 
-    server.vm.provision "shell", inline: 'echo "export DOCKER_USERNAME=' + "'" + ENV["DOCKER_USERNAME"] + "'" + '" >> ~/.bash_profile'
-    server.vm.provision "shell", inline: 'echo "export DOCKER_PASSWORD=' + "'" + ENV["DOCKER_PASSWORD"] + "'" + '" >> ~/.bash_profile'
-
     server.vm.provision "shell", inline: <<-SHELL
+
+    echo "export DOCKER_USERNAME=' + "'" + ENV["DOCKER_USERNAME"] + "'" + '" >> ~/.bash_profile
+    echo "export DOCKER_PASSWORD=' + "'" + ENV["DOCKER_PASSWORD"] + "'" + '" >> ~/.bash_profile
 
     # Prevent interactive prompts from stalling the installation
     export DEBIAN_FRONTEND=noninteractive
@@ -39,16 +39,13 @@ Vagrant.configure("2") do |config|
     curl -fsSL https://get.docker.com -o get-docker.sh
     sudo sh get-docker.sh
 
-    sudo systemctl status docker
-    # sudo usermod -aG docker ${USER}
+    # sudo systemctl status docker
 
     echo -e "\nVerifying that docker works ...\n"
     docker run --rm hello-world
     docker rmi hello-world
 
     echo -e "\nOpening port for minitwit ...\n"
-    ufw allow 5000 && \
-    ufw allow 22/tcp
 
     echo ". $HOME/.bashrc" >> $HOME/.bash_profile
 
@@ -62,8 +59,6 @@ Vagrant.configure("2") do |config|
     chmod +x /minitwit/deploy.sh
 
     echo -e "\nVagrant setup done ..."
-    echo -e "minitwit will later be accessible at http://$(hostname -I | awk '{print $1}'):5000"
-    echo -e "The mysql database needs a minute to initialize, if the landing page shows an error stack-trace ..."
 
     SHELL
   end
