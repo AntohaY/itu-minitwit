@@ -82,7 +82,7 @@ jobs:
           echo "DIGITAL_OCEAN_DATABASE_NAME=$DIGITAL_OCEAN_DATABASE_NAME" >> .env
           echo "MONGO_URI=mongodb+srv://${DIGITAL_OCEAN_DATABASE_USERNAME}:${DIGITAL_OCEAN_DATABASE_PWD}@minitwit-dbserver-1-77977c42.mongo.ondigitalocean.com/${DIGITAL_OCEAN_DATABASE_NAME}?tls=true&authSource=admin" >> .env
           
-          scp -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no -r remote_files/docker-compose.yml remote_files/deploy.sh remote_files/prometheus.yml .env monitoring $SSH_USER@$SSH_HOST:/minitwit/
+          scp -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no -r remote_files/docker-compose.yml remote_files/deploy.sh remote_files/prometheus.yml .env .query-logs.sh monitoring $SSH_USER@$SSH_HOST:/minitwit/
           
           ssh $SSH_USER@$SSH_HOST -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no 'chmod +x /minitwit/deploy.sh && cd /minitwit && ./deploy.sh'
         env:
