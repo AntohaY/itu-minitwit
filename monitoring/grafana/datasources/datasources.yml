@@ -8,3 +8,11 @@ datasources:
     isDefault: true
     editable: false
     uid: ituminitwitprometheus
+
+  - name: Loki
+    type: loki
+    url: http://loki:3100
+    access: proxy
+    isDefault: false
+    editable: true
+    uid: ituminitwitloki
