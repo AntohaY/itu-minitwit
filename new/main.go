@@ -23,6 +23,7 @@ package main
 import (
 	"log/slog"
 	"minitwit/api"
+	"minitwit/domains"
 	"minitwit/handlers"
 	"net/http" // built-in library which replace flask
 	"os"       // read environment variables (for example DB_IP)
@@ -137,14 +138,17 @@ func main() {
 	// ==========================================
 	// 4. UI ROUTES (Web Browser)
 	// ==========================================
+	DBinProduction := &domains.MongoUserStore{
+		DB: app.DB,
+	}
+
 	uiRouter := router.PathPrefix("/").Subrouter()
 	uiRouter.Use(BeforeAfterMiddleware)
 	uiRouter.Use(authMiddleware)
 
 	uiRouter.HandleFunc("/", handlers.PublicTimelineHandler).Methods("GET")
-	uiRouter.HandleFunc("/login", handlers.LoginHandler)
-	uiRouter.HandleFunc("/register", handlers.RegisterHandler)
-
+	uiRouter.HandleFunc("/login", handlers.LoginHandler(DBinProduction))
+	uiRouter.HandleFunc("/register", handlers.RegisterHandler(DBinProduction))
 	uiRouter.HandleFunc("/timeline", handlers.PersonalTimelineHandler).Methods("GET")
 	uiRouter.HandleFunc("/logout", handlers.LogoutHandler)
 	uiRouter.HandleFunc("/user/follow/{username}", handlers.FollowUser).Methods("GET")

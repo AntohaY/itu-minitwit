@@ -17,6 +17,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	. "minitwit/types"
 
 	"github.com/gorilla/sessions"
@@ -82,9 +84,17 @@ func GravatarURL(email string) string {
 }
 
 // CheckPasswordHash compares a plain password with a hashed password
-func CheckPasswordHash(password, hashedPW string) bool {
-	// TODO: implement proper password hashing comparison
-	return password == hashedPW
+func CheckPasswordHash(password, storedHash string) bool {
+	if storedHash == "" {
+		return false
+	}
+	// compare new users
+	err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password))
+	if err == nil {
+		return true
+	}
+	// compare old users, which passwords were not hashed
+	return password == storedHash
 }
 
 // GetCurrentUser extracts the current user from the request context
