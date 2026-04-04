@@ -19,6 +19,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"minitwit/domains"
 	. "minitwit/types"
 
 	"github.com/gorilla/sessions"
@@ -98,13 +99,13 @@ func CheckPasswordHash(password, storedHash string) bool {
 }
 
 // GetCurrentUser extracts the current user from the request context
-func GetCurrentUser(r *http.Request) *User {
+func GetCurrentUser(r *http.Request) *domains.User {
 	val := r.Context().Value("user")
 	if val == nil {
 		return nil
 	}
 
-	user, ok := val.(User)
+	user, ok := val.(domains.User)
 	if !ok {
 		return nil
 	}

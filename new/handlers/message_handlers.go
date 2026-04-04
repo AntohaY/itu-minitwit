@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"minitwit/app"
+	"minitwit/domains"
 	. "minitwit/helpers/flashes"
 	"minitwit/helpers/requestctx"
-	. "minitwit/types"
+
+	//	. "minitwit/types"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -33,7 +35,7 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	currentUser := userVal.(User)
+	currentUser := userVal.(domains.User)
 	slog.Debug("message create attempt", "request_id", requestID)
 
 	text := strings.TrimSpace(r.FormValue("text"))

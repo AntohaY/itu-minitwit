@@ -6,7 +6,8 @@ import (
 	"minitwit/helpers/requestctx"
 	"net/http"
 
-	. "minitwit/types"
+	"minitwit/domains"
+	//. "minitwit/types"
 
 	"github.com/gorilla/sessions"
 	"go.mongodb.org/mongo-driver/bson"
@@ -25,7 +26,7 @@ func AuthMiddleware(store *sessions.CookieStore, db *mongo.Database) func(http.H
 			if userIDStr, ok := session.Values["user_id"].(string); ok {
 				slog.Debug("session contains user id", "request_id", requestID)
 				// 3. Find the User in DB
-				var currentUser User
+				var currentUser domains.User
 				objID, err := primitive.ObjectIDFromHex(userIDStr)
 				if err != nil {
 					slog.Warn("invalid user id in session", "request_id", requestID)

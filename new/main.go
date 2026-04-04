@@ -138,9 +138,9 @@ func main() {
 	// ==========================================
 	// 4. UI ROUTES (Web Browser)
 	// ==========================================
-	DBinProduction := &domains.MongoUserStore{
-		DB: app.DB,
-	}
+	DBinProduction := &domains.MongoUserStore{DB: app.DB}
+	FollowInProduction := &domains.MongoFollowStore{DB: app.DB}
+	userStore := &domains.MongoUserStore{DB: app.DB}
 
 	uiRouter := router.PathPrefix("/").Subrouter()
 	uiRouter.Use(BeforeAfterMiddleware)
@@ -151,8 +151,8 @@ func main() {
 	uiRouter.HandleFunc("/register", handlers.RegisterHandler(DBinProduction))
 	uiRouter.HandleFunc("/timeline", handlers.PersonalTimelineHandler).Methods("GET")
 	uiRouter.HandleFunc("/logout", handlers.LogoutHandler)
-	uiRouter.HandleFunc("/user/follow/{username}", handlers.FollowUser).Methods("GET")
-	uiRouter.HandleFunc("/user/unfollow/{username}", handlers.UnfollowUser).Methods("GET")
+	uiRouter.HandleFunc("/user/follow/{username}", handlers.FollowUser(FollowInProduction, userStore)).Methods("GET")
+	uiRouter.HandleFunc("/user/unfollow/{username}", handlers.UnfollowUser(FollowInProduction, userStore)).Methods("GET")
 	uiRouter.HandleFunc("/user/{username}", handlers.UserTimelineHandler).Methods("GET")
 	uiRouter.HandleFunc("/add_message", handlers.AddMessageHandler).Methods("POST")
 	slog.Info("server starting", "port", 8080)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"minitwit/app"
+	"minitwit/domains"
 	. "minitwit/helpers/flashes"
 	"minitwit/helpers/requestctx"
 	. "minitwit/types"
@@ -29,9 +30,9 @@ func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var currUser *User
+	var currUser *domains.User
 	if u := r.Context().Value("user"); u != nil {
-		val := u.(User)
+		val := u.(domains.User)
 		currUser = &val
 	}
 
@@ -74,9 +75,9 @@ func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	requestID := requestctx.RequestIDFromRequest(r)
 	slog.Debug("personal timeline handler called", "page", page, "skip", skip, "request_id", requestID)
 
-	var currUser *User
+	var currUser *domains.User
 	if u := r.Context().Value("user"); u != nil {
-		val := u.(User)
+		val := u.(domains.User)
 		currUser = &val
 	}
 
@@ -131,7 +132,7 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	var profileUser User
+	var profileUser domains.User
 	err := app.DB.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&profileUser)
 	if err != nil {
 		slog.Warn("user timeline profile not found", "username", username, "request_id", requestID)
@@ -139,16 +140,16 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var currUser *User
+	var currUser *domains.User
 	if u := r.Context().Value("user"); u != nil {
-		val := u.(User)
+		val := u.(domains.User)
 		currUser = &val
 	}
 
 	followed := false
 	if currUser != nil {
 		var result struct{}
-		err := app.DB.Collection("follower").FindOne(ctx, bson.M{
+		err := app.DB.Collection("follow").FindOne(ctx, bson.M{
 			"who_id":  currUser.ID,
 			"whom_id": profileUser.ID,
 		}).Decode(&result)
@@ -231,9 +232,9 @@ func NotFoundHandler(w http.ResponseWriter, r *http.Request) {
 	slog.Warn("not found handler called", "path", r.URL.Path, "request_id", requestID)
 	w.WriteHeader(http.StatusNotFound)
 
-	var currUser *User
+	var currUser *domains.User
 	if u := r.Context().Value("user"); u != nil {
-		val := u.(User)
+		val := u.(domains.User)
 		currUser = &val
 	}
 

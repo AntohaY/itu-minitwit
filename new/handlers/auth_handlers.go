@@ -27,7 +27,7 @@ func RegisterHandler(store domains.UserStore) http.HandlerFunc {
 		user := r.Context().Value("user")
 		if user != nil {
 			slog.Info("register skipped for authenticated user", "request_id", requestID)
-			SetFlash(w, "You are already logged in as "+user.(User).Username)
+			SetFlash(w, "You are already logged in as "+user.(domains.User).Username)
 			http.Redirect(w, r, "/", http.StatusFound)
 			return
 		}
