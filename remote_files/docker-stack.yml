@@ -6,56 +6,52 @@ x-syslog-logging: &syslog_logging
     syslog-format: rfc5424micro
 
 services:
-#  dbserver:
-#    image: ${DOCKER_USERNAME}/dbminitwitimage:latest
-#    restart: unless-stopped
-#    environment:
-##      - MONGO_INITDB_DATABASE=test
-#      - MONGO_URI=mongodb+srv://${DIGITAL_OCEAN_DATABASE_USERNAME}:${DIGITAL_OCEAN_DATABASE_PWD}@minitwit-dbserver-1-77977c42.mongo.ondigitalocean.com/${DIGITAL_OCEAN_DATABASE_NAME}?tls=true&authSource=admin
-#    networks:
-#      - minitwit-network
-#    volumes:
-#      - minitwit_cloud_data:/data/db
-#    healthcheck:
-#      test: [ "CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')" ]
-#      interval: 60s
-#      timeout: 10s
-#      retries: 5
-#      start_period: 90s
-
   webserver:
     image: ${DOCKER_USERNAME}/webminitwitimage:latest
-    restart: unless-stopped
     ports:
       - "80:8080"
     environment:
       - MONGO_URI=${MONGO_URI}
-    volumes:
-      - ./new/logs:/usr/src/app/logs
+#    volumes:
+#      - /minitwit/new/logs:/usr/src/app/logs
     networks:
       - minitwit-network
     logging: *syslog_logging
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      replicas: 3 # Scale  web application
+      # -update_config-  ensures rolling updates. Which means, if we push a new version of the app and update ,
+      # to the stack, Swarm will execute a rolling update to ensure app does not go offline.
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
 
-  # --- NEW MONITORING SERVICES ---
   prometheus:
     image: prom/prometheus:latest
-    container_name: prometheus
     ports:
       - "9090:9090"
     networks:
       - minitwit-network
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - /minitwit/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_cloud_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
-    restart: unless-stopped
     logging: *syslog_logging
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager # Keep data tied to this specific node
 
   grafana:
     image: grafana/grafana:latest
-    container_name: grafana
     ports:
       - "3000:3000"
     environment:
@@ -65,35 +61,37 @@ services:
       - minitwit-network
     volumes:
       - grafana_cloud_data:/var/lib/grafana
-      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
-    restart: unless-stopped
+      - /minitwit/monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
     logging: *syslog_logging
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
 
   loki:
     image: grafana/loki:latest
-    container_name: loki
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - minitwit-network
-    restart: unless-stopped
     logging: *syslog_logging
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
 
   promtail:
     image: grafana/promtail:latest
-    container_name: promtail
     volumes:
-      # Mount the rsyslog data volume as read-only
       - rsyslog_data:/var/log/remote:ro
-      # Mount the Promtail configuration file
-      - ./monitoring/promtail/config.yml:/etc/promtail/config.yml:ro
+      - /minitwit/monitoring/promtail/config.yml:/etc/promtail/config.yml:ro
     command: -config.file=/etc/promtail/config.yml
     networks:
       - minitwit-network
-    restart: unless-stopped
     logging: *syslog_logging
+    deploy:
+      mode: global # Runs on every node to collect logs from all servers
 
   discordbot:
     image: ${DOCKER_USERNAME}/discordbotimage:latest
@@ -102,33 +100,45 @@ services:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
     networks:
       - minitwit-network
-    restart: unless-stopped
     logging: *syslog_logging
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        order: stop-first
 
   central-rsyslog:
-    build:
-      context: ./monitoring/rsyslog
-      dockerfile: Dockerfile
-    container_name: central-rsyslog
-    restart: unless-stopped
+    image: ${DOCKER_USERNAME}/central-rsyslog:latest
     environment:
       - RSYSLOG_RETENTION_DAYS=7
       - RSYSLOG_CLEANUP_INTERVAL_SECONDS=3600
     ports:
-      - "5514:514/tcp"
-      - "5514:514/udp"
+      - target: 514
+        published: 5514
+        protocol: tcp
+        mode: host
+      - target: 514
+        published: 5514
+        protocol: udp
+        mode: host
     networks:
       - minitwit-network
     volumes:
       - rsyslog_data:/var/log/remote
+    deploy:
+      mode: global # Ensures a syslog listener runs on every worker node
 
 networks:
   minitwit-network:
-    driver: bridge
+    driver: overlay # Required for Swarm to communicate across Droplets
 
 volumes:
-  minitwit_cloud_data:
   prometheus_cloud_data:
+    external: true
+    name: minitwit_prometheus_cloud_data
+
   grafana_cloud_data:
-  webserver_logs:
+    external: true
+    name: minitwit_grafana_cloud_data
+
   rsyslog_data:
