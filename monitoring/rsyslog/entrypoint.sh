@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/sh
+set -eu
 
 RETENTION_DAYS="${RSYSLOG_RETENTION_DAYS:-7}"
 CLEANUP_INTERVAL_SECONDS="${RSYSLOG_CLEANUP_INTERVAL_SECONDS:-3600}"

@@ -25,15 +25,14 @@ services:
     logging: *syslog_logging
 
   webserver:
-    build:
-      context: ./new
-      dockerfile: ../docker/web/Dockerfile.dev
+    image: minitwit-webserver:local
     volumes:
-      - ./new:/app
-      - ./new/logs:/usr/src/app/logs
-    depends_on:
-      dbserver:
-        condition: service_healthy
+      - type: bind
+        source: C:/Users/anton/GolandProjects/itu-minitwit/new # Change this according to your local environment
+        target: /app
+      - type: bind
+        source: C:/Users/anton/GolandProjects/itu-minitwit/new/logs # Change this according to your local environment
+        target: /usr/src/app/logs
     ports:
       - "8080:8080"
     environment:
@@ -47,54 +46,55 @@ services:
       retries: 5
       start_period: 30s
     logging: *syslog_logging
+    deploy:
+      replicas: 2
+      # Rolling updates
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
 
   clidownload:
     image: curlimages/curl
-    depends_on:
-      webserver:
-        condition: service_healthy
     networks:
       - minitwit-network
     entrypoint: sh -c "curl http://webserver:8080"
     logging: *syslog_logging
+    deploy:
+      restart_policy:
+        condition: on-failure
 
   central-rsyslog:
-    build:
-      context: ./monitoring/rsyslog
-      dockerfile: Dockerfile
-    container_name: central-rsyslog
-    restart: unless-stopped
+    image: central-rsyslog:local
     environment:
       - RSYSLOG_RETENTION_DAYS=7
       - RSYSLOG_CLEANUP_INTERVAL_SECONDS=3600
     ports:
-      - "5514:514/tcp"
-      - "5514:514/udp"
+      - target: 514
+        published: 5514
+        protocol: tcp
+        mode: host
+      - target: 514
+        published: 5514
+        protocol: udp
+        mode: host
     networks:
       - minitwit-network
     volumes:
       - rsyslog_data:/var/log/remote
 
   grafana:
-    build:
-      dockerfile: ./Dockerfile
-      context: ./monitoring/grafana
-    image: grafana_image
-    container_name: grafana
+    image: grafana_image:local
     ports:
       - "3000:3000"
     networks:
       - minitwit-network
     volumes:
-      - grafana-storage:/var/lib/grafana
+      - grafana_cloud_data:/var/lib/grafana
     logging: *syslog_logging
 
   prometheus:
-    build:
-      dockerfile: ./Dockerfile
-      context: ./monitoring/prometheus
-    image: prometheus_image
-    container_name: prometheus
+    image: prometheus_image:local
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
     ports:
@@ -105,47 +105,42 @@ services:
 
   loki:
     image: grafana/loki:latest
-    container_name: loki
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - minitwit-network
-    restart: unless-stopped
     logging: *syslog_logging
 
   promtail:
     image: grafana/promtail:latest
-    container_name: promtail
     volumes:
-      # Mount the rsyslog data volume as read-only
-      - rsyslog_data:/var/log/remote:ro
-      # Mount the Promtail configuration file
-      - ./monitoring/promtail/config.yml:/etc/promtail/config.yml:ro
+      - type: volume
+        source: rsyslog_data
+        target: /var/log/remote
+        read_only: true
+      - type: bind
+        source: C:/Users/anton/GolandProjects/itu-minitwit/monitoring/promtail/config.yml
+        target: /etc/promtail/config.yml
+        read_only: true
     command: -config.file=/etc/promtail/config.yml
     networks:
       - minitwit-network
-    restart: unless-stopped
     logging: *syslog_logging
-
-#  discordbot:
-#    build:
-#      context: ./new/bot
-#      dockerfile: Dockerfile
-#    depends_on:
-#      dbserver:
-#        condition: service_healthy
-#    environment:
-#      - MONGO_URI=mongodb://dbserver:27017
-#      - DISCORD_TOKEN=${DISCORD_TOKEN}
-#    networks:
-#      - minitwit-network
 
 networks:
   minitwit-network:
-    driver: bridge
+    driver: overlay # Required for Swarm
 
 volumes:
-  mongo_local_data:
-  grafana-storage:
+  prometheus_cloud_data:
+    external: true
+    name: minitwit_prometheus_cloud_data
+
+  grafana_cloud_data:
+    external: true
+    name: minitwit_grafana_cloud_data
+
   rsyslog_data:
+  webserver_logs:
+  mongo_local_data:
