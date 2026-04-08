@@ -62,6 +62,7 @@ services:
     volumes:
       - grafana_cloud_data:/var/lib/grafana
       - /minitwit/monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - /minitwit/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
     logging: *syslog_logging
     deploy:
       placement:
