@@ -18,7 +18,7 @@ services:
       - minitwit-network
     logging: *syslog_logging
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080" ]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080"]
       interval: 10s
       timeout: 5s
       retries: 5
