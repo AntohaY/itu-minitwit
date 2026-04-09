@@ -245,3 +245,8 @@ func NotFoundHandler(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("not found render", "request_id", requestID)
 	app.RenderTemplate(w, "404.html", data)
 }
+
+func PingHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("OK"))
+}

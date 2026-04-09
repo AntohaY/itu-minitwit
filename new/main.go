@@ -145,6 +145,8 @@ func main() {
 	uiRouter.HandleFunc("/login", handlers.LoginHandler)
 	uiRouter.HandleFunc("/register", handlers.RegisterHandler)
 
+	uiRouter.HandleFunc("/ping", handlers.PingHandler)
+
 	uiRouter.HandleFunc("/timeline", handlers.PersonalTimelineHandler).Methods("GET")
 	uiRouter.HandleFunc("/logout", handlers.LogoutHandler)
 	uiRouter.HandleFunc("/user/follow/{username}", handlers.FollowUser).Methods("GET")
