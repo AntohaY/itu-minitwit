@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -34,4 +35,10 @@ func (m *MongoUserStore) GetUserByUsername(ctx context.Context, username string)
 	// Find the user by username
 	err := m.DB.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&foundUser)
 	return foundUser, err
+}
+
+func (m *MongoUserStore) GetUserByID(ctx context.Context, id primitive.ObjectID) (User, error) {
+	var user User
+	err := m.DB.Collection("user").FindOne(ctx, bson.M{"_id": id}).Decode(&user)
+	return user, err
 }

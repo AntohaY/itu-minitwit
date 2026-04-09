@@ -20,4 +20,5 @@ type UserStore interface {
 	Exists(ctx context.Context, username string) (bool, error)
 	Create(ctx context.Context, user User) error
 	GetUserByUsername(ctx context.Context, username string) (User, error)
+	GetUserByID(ctx context.Context, id primitive.ObjectID) (User, error)
 }
