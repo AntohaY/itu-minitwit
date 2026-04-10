@@ -3,14 +3,14 @@ package handlers
 import (
 	"context"
 	"log/slog"
-	"net/http"
-	"strings"
-	"time"
-
 	"minitwit/app"
+	"minitwit/helpers"
 	"minitwit/helpers/flashes"
 	"minitwit/helpers/requestctx"
 	"minitwit/types"
+	"net/http"
+	"strings"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -26,14 +26,19 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userVal := r.Context().Value("user")
+	userVal := r.Context().Value(helpers.UserContextKey)
 	if userVal == nil {
 		slog.Warn("unauthorized message create attempt", "request_id", requestID)
 		app.LogFollowError("POST ERROR: Unauthorized user tried to create a post")
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	currentUser := userVal.(types.User)
+	currentUser, ok := userVal.(*types.User)
+	if !ok || currentUser == nil {
+		slog.Warn("message create user assertion failed", "request_id", requestID)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 	slog.Debug("message create attempt", "request_id", requestID)
 
 	text := strings.TrimSpace(r.FormValue("text"))

@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"log/slog"
+	"minitwit/helpers"
 	"minitwit/helpers/requestctx"
 	"net/http"
 
@@ -13,10 +14,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
-
-type contextKey string
-
-const userKey contextKey = "user"
 
 // AuthMiddleware verify user
 func AuthMiddleware(store *sessions.CookieStore, db *mongo.Database) func(http.Handler) http.Handler {
@@ -29,7 +26,7 @@ func AuthMiddleware(store *sessions.CookieStore, db *mongo.Database) func(http.H
 			if userIDStr, ok := session.Values["user_id"].(string); ok {
 				slog.Debug("session contains user id", "request_id", requestID)
 				// 3. Find the User in DB
-				var currentUser types.User
+				currentUser := new(types.User)
 				objID, err := primitive.ObjectIDFromHex(userIDStr)
 				if err != nil {
 					slog.Warn("invalid user id in session", "request_id", requestID)
@@ -37,11 +34,11 @@ func AuthMiddleware(store *sessions.CookieStore, db *mongo.Database) func(http.H
 					return
 				}
 
-				err = db.Collection("user").FindOne(context.TODO(), bson.M{"_id": objID}).Decode(&currentUser)
+				err = db.Collection("user").FindOne(context.TODO(), bson.M{"_id": objID}).Decode(currentUser)
 
 				if err == nil {
-					ctx := context.WithValue(r.Context(), userKey, currentUser) // we create updated context
-					r = r.WithContext(ctx)                                      // update the request with the new context
+					ctx := context.WithValue(r.Context(), helpers.UserContextKey, currentUser) // we create updated context
+					r = r.WithContext(ctx)                                                     // update the request with the new context
 				} else {
 					slog.Warn("failed to resolve user from session", "request_id", requestID)
 				}

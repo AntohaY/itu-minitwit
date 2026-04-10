@@ -3,14 +3,12 @@ package handlers
 import (
 	"context"
 	"log/slog"
+	"minitwit/app"
+	"minitwit/helpers/requestctx"
+	"minitwit/types"
 	"net/http"
 	"strings"
 	"time"
-
-	"minitwit/app"
-	"minitwit/helpers/flashes"
-	"minitwit/helpers/requestctx"
-	"minitwit/types"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -23,14 +21,6 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	requestID := requestctx.RequestIDFromRequest(r)
 	slog.Debug("register handler called", "method", r.Method, "request_id", requestID)
-
-	user := r.Context().Value("user")
-	if user != nil {
-		slog.Info("register skipped for authenticated user", "request_id", requestID)
-		flashes.SetFlash(w, "You are already logged in as "+user.(types.User).Username)
-		http.Redirect(w, r, "/", http.StatusFound)
-		return
-	}
 
 	errMsg := ""
 	if r.Method == http.MethodPost {
@@ -97,12 +87,6 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	requestID := requestctx.RequestIDFromRequest(r)
 	slog.Debug("login handler called", "method", r.Method, "request_id", requestID)
 
-	user := r.Context().Value("user")
-	if user != nil {
-		slog.Info("login skipped for authenticated user", "request_id", requestID)
-		http.Redirect(w, r, "/", http.StatusFound)
-		return
-	}
 	var flashes []string
 
 	if r.Method == http.MethodPost {
@@ -148,7 +132,9 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	slog.Debug("render login page", "request_id", requestID)
 	data := types.BaseContext{
-		Flashes: flashes,
+		Flashes:     flashes,
+		PageTitle:   "Sign In",
+		CurrentUser: nil,
 	}
 	app.RenderTemplate(w, "login.html", data)
 }

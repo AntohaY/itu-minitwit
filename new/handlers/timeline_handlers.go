@@ -3,13 +3,13 @@ package handlers
 import (
 	"context"
 	"log/slog"
-	"net/http"
-	"time"
-
 	"minitwit/app"
+	"minitwit/helpers"
 	"minitwit/helpers/flashes"
 	"minitwit/helpers/requestctx"
 	"minitwit/types"
+	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
@@ -30,9 +30,10 @@ func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var currUser *types.User
-	if u := r.Context().Value("user"); u != nil {
-		val := u.(types.User)
-		currUser = &val
+	if u := r.Context().Value(helpers.UserContextKey); u != nil {
+		if val, ok := u.(*types.User); ok {
+			currUser = val
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -75,9 +76,10 @@ func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("personal timeline handler called", "page", page, "skip", skip, "request_id", requestID)
 
 	var currUser *types.User
-	if u := r.Context().Value("user"); u != nil {
-		val := u.(types.User)
-		currUser = &val
+	if u := r.Context().Value(helpers.UserContextKey); u != nil {
+		if val, ok := u.(*types.User); ok {
+			currUser = val
+		}
 	}
 
 	if currUser == nil {
@@ -140,9 +142,10 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var currUser *types.User
-	if u := r.Context().Value("user"); u != nil {
-		val := u.(types.User)
-		currUser = &val
+	if u := r.Context().Value(helpers.UserContextKey); u != nil {
+		if val, ok := u.(*types.User); ok {
+			currUser = val
+		}
 	}
 
 	followed := false
@@ -236,9 +239,10 @@ func NotFoundHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotFound)
 
 	var currUser *types.User
-	if u := r.Context().Value("user"); u != nil {
-		val := u.(types.User)
-		currUser = &val
+	if u := r.Context().Value(helpers.UserContextKey); u != nil {
+		if val, ok := u.(*types.User); ok {
+			currUser = val
+		}
 	}
 
 	data := types.TimelineUserData{

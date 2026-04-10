@@ -9,6 +9,7 @@ import (
 	"html/template"
 	"log/slog"
 	"math"
+	"minitwit/helpers"
 	"minitwit/helpers/logsanitize"
 	"net/http"
 	"os"
@@ -89,17 +90,19 @@ func CheckPasswordHash(password, hashedPW string) bool {
 
 // GetCurrentUser extracts the current user from the request context
 func GetCurrentUser(r *http.Request) *types.User {
-	val := r.Context().Value("user")
+	val := r.Context().Value(helpers.UserContextKey)
 	if val == nil {
 		return nil
 	}
 
-	user, ok := val.(types.User)
-	if !ok {
+	switch u := val.(type) {
+	case *types.User:
+		return u
+	case types.User:
+		return &u
+	default:
 		return nil
 	}
-
-	return &user
 }
 
 // RenderTemplate renders an HTML template with the given data

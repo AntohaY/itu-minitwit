@@ -109,7 +109,7 @@ func main() {
 		}
 
 		// 2. Handle standard Web Browser UI requests
-		// Wrap the UI handler in the auth middleware dynamically so r.Context().Value("user") still works
+		// Wrap the UI handler in the auth middleware dynamically so context.Value(helpers.UserContextKey) still works
 		uiNotFound := authMiddleware(http.HandlerFunc(handlers.NotFoundHandler))
 		uiNotFound.ServeHTTP(w, r)
 	})
