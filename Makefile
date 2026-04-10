@@ -1,16 +1,5 @@
-# Old makeFile
-
-#init:
-#	python -c"from minitwit import init_db; init_db()"
-
-#build:
-#	gcc flag_tool.c -l sqlite3 -o flag_tool
-
-#clean:
-#	rm flag_tool
-
-# new makeFile
-
+# --- 1. Colors & Variables ---
+RED    := $(shell tput -Txterm setaf 1)
 GREEN  := $(shell tput -Txterm setaf 2)
 CYAN   := $(shell tput -Txterm setaf 6)
 RESET  := $(shell tput -Txterm sgr0)
@@ -18,16 +7,44 @@ RESET  := $(shell tput -Txterm sgr0)
 GO_DIR=new
 DOCKER_FILES=$(shell find . -name "Dockerfile*")
 
+ci-setup:
+	@echo "$(CYAN)==> Starting containers in background...$(RESET)"
+	docker compose up -d --build
+	@echo "Waiting for webserver to be healthy..."
+	sleep 15 
+
+ci-cleanup:
+	@echo "$(CYAN)==> Tearing down Docker environment...$(RESET)"
+	docker compose down -v
+
+# ---------- Tests ---------------
+
+# The Simulator: Captures output, fails fast, and reports errors
+test-sim:
+	@echo "$(CYAN)==> Running simulator...$(RESET)"
+	@python3 -m pip install requests --user -q
+	@tmpfile=$$(mktemp); \
+	timeout 500s python3 minitwit_simulator.py http://localhost:8080 >"$$tmpfile" 2>&1; \
+	EXIT_STATUS=$$?; \
+	if [ $$EXIT_STATUS -ne 0 ]; then \
+		echo "$(RED)Simulator Failed (Exit Code: $$EXIT_STATUS)$(RESET)"; \
+		echo "--- Communication from Simulator ---"; \
+		cat "$$tmpfile"; \
+		rm -f "$$tmpfile"; \
+		exit 1; \
+	else \
+		echo "$(GREEN)Simulator finished perfectly with zero errors!$(RESET)"; \
+		rm -f "$$tmpfile"; \
+	fi
+
 fmt:
 	@echo "$(CYAN)==> Formatting Go code...$(RESET)"
 	cd $(GO_DIR) && go fmt ./...
 
-# 2. Run Go Static Analysis (Staticcheck)
 lint-go:
 	@echo "$(CYAN)==> Running staticcheck...$(RESET)"
 	cd $(GO_DIR) && golangci-lint run ./...
 
-# 3. Run Hadolint on all Dockerfiles found in the repo
 lint-docker:
 	@echo "$(CYAN)==> Running Hadolint on all Dockerfiles...$(RESET)"
 	@$(foreach file,$(DOCKER_FILES), \
@@ -35,13 +52,20 @@ lint-docker:
 		docker run --rm -i hadolint/hadolint < $(file) || exit 1; \
 	)
 
-# 4. Run Go unit tests
 test:
-	@echo "$(CYAN)==> Running Go tests...$(RESET)"
+	@echo "$(CYAN)==> Running Go unit tests...$(RESET)"
 	cd $(GO_DIR) && go test -v ./...
 
-# 5. The "Mega Check" - run everything at once
-verify: fmt lint-go lint-docker test
-	@echo "$(GREEN) All local checks passed! $(RESET)"
+# --------- Execute tests --------------------------
 
-.PHONY: init build clean fmt lint-go lint-docker test verify
+# if one test file, still environment is cleaned up correctly
+verify:
+	@$(MAKE) ci-setup
+	@$(MAKE) run-checks || (ret=$$?; $(MAKE) ci-cleanup; exit $$ret)
+	@$(MAKE) ci-cleanup
+	@echo "$(GREEN) All checks passed and environment cleaned!$(RESET)"
+
+# Helper to group all checks together
+run-checks: test-sim fmt lint-go lint-docker test
+
+.PHONY: ci-setup test-sim fmt lint-go lint-docker test verify ci-cleanup run-checks
