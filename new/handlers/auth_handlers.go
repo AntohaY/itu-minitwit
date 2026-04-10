@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"minitwit/app"
-	. "minitwit/helpers/flashes"
+	"minitwit/helpers/flashes"
 	"minitwit/helpers/requestctx"
-	. "minitwit/types"
+	"minitwit/types"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -27,14 +27,18 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value("user")
 	if user != nil {
 		slog.Info("register skipped for authenticated user", "request_id", requestID)
-		SetFlash(w, "You are already logged in as "+user.(User).Username)
+		flashes.SetFlash(w, "You are already logged in as "+user.(types.User).Username)
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 
 	errMsg := ""
 	if r.Method == http.MethodPost {
-		r.ParseForm()
+		if err := r.ParseForm(); err != nil {
+			slog.Warn("failed to parse form", "error", err.Error(), "request_id", requestID)
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
 		username := r.FormValue("username")
 		email := r.FormValue("email")
 		password := r.FormValue("password")
@@ -52,7 +56,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		} else if app.GetUserID(username) != primitive.NilObjectID {
 			errMsg = "The username is already taken"
 		} else {
-			newUser := User{
+			newUser := types.User{
 				Username: username,
 				Email:    email,
 				PW:       password,
@@ -60,7 +64,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			if _, err := app.DB.Collection("user").InsertOne(ctx, newUser); err != nil {
 				slog.Error("registration database error", "error", err.Error(), "request_id", requestID)
-				data := TimelineUserData{
+				data := types.TimelineUserData{
 					PageTitle: "Register",
 					Flashes:   []string{"Database error occurred"},
 				}
@@ -73,7 +77,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	data := TimelineUserData{
+	data := types.TimelineUserData{
 		PageTitle: "Register",
 		Flashes:   []string{},
 	}
@@ -102,12 +106,16 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var flashes []string
 
 	if r.Method == http.MethodPost {
-		r.ParseForm()
+		if err := r.ParseForm(); err != nil {
+			slog.Warn("failed to parse form", "error", err.Error(), "request_id", requestID)
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
 		username := r.FormValue("username")
 		password := r.FormValue("password")
 		slog.Debug("login attempt", "username", username, "request_id", requestID)
 
-		var foundUser User
+		var foundUser types.User
 		filter := bson.M{"username": username}
 
 		dberr := app.DB.Collection("user").FindOne(ctx, filter).Decode(&foundUser)
@@ -126,7 +134,11 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 			} else {
 				session, _ := app.Store.Get(r, "minitwit-session")
 				session.Values["user_id"] = foundUser.ID.Hex()
-				session.Save(r, w)
+				if err := session.Save(r, w); err != nil {
+					slog.Error("failed to save session", "error", err.Error(), "request_id", requestID)
+					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+					return
+				}
 				slog.Info("login successful", "request_id", requestID)
 				http.Redirect(w, r, "/", http.StatusFound)
 				return
@@ -135,7 +147,10 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Debug("render login page", "request_id", requestID)
-	app.RenderTemplate(w, "login.html", nil)
+	data := types.BaseContext{
+		Flashes: flashes,
+	}
+	app.RenderTemplate(w, "login.html", data)
 }
 
 // LogoutHandler handles user logout

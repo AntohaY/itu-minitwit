@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"minitwit/app"
-	. "minitwit/helpers/flashes"
+	"minitwit/helpers/flashes"
 	"minitwit/helpers/requestctx"
-	. "minitwit/types"
+	"minitwit/types"
 
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
@@ -29,9 +29,9 @@ func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var currUser *User
+	var currUser *types.User
 	if u := r.Context().Value("user"); u != nil {
-		val := u.(User)
+		val := u.(types.User)
 		currUser = &val
 	}
 
@@ -51,13 +51,13 @@ func PublicTimelineHandler(w http.ResponseWriter, r *http.Request) {
 
 	totalPages, prevPage, nextPage, visiblePages := app.GetPaginationInfo(totalMessages, page, app.PER_PAGE, 5)
 
-	data := TimelineUserData{
+	data := types.TimelineUserData{
 		PageTitle:    "Public Timeline",
 		PageID:       "public",
 		Messages:     msgs,
 		CurrentUser:  currUser,
 		ProfileUser:  nil,
-		Flashes:      GetFlash(w, r),
+		Flashes:      flashes.GetFlash(w, r),
 		Page:         page,
 		NextPage:     nextPage,
 		PrevPage:     prevPage,
@@ -74,9 +74,9 @@ func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	requestID := requestctx.RequestIDFromRequest(r)
 	slog.Debug("personal timeline handler called", "page", page, "skip", skip, "request_id", requestID)
 
-	var currUser *User
+	var currUser *types.User
 	if u := r.Context().Value("user"); u != nil {
-		val := u.(User)
+		val := u.(types.User)
 		currUser = &val
 	}
 
@@ -102,7 +102,7 @@ func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 
 	totalPages, prevPage, nextPage, visiblePages := app.GetPaginationInfo(totalMessages, page, app.PER_PAGE, 5)
 
-	data := TimelineUserData{
+	data := types.TimelineUserData{
 		PageTitle:    "My Timeline",
 		PageID:       "personal",
 		Messages:     msgs,
@@ -111,7 +111,7 @@ func PersonalTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		Page:         page,
 		NextPage:     nextPage,
 		PrevPage:     prevPage,
-		Flashes:      GetFlash(w, r),
+		Flashes:      flashes.GetFlash(w, r),
 		TotalPages:   totalPages,
 		VisiblePages: visiblePages,
 	}
@@ -131,7 +131,7 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	var profileUser User
+	var profileUser types.User
 	err := app.DB.Collection("user").FindOne(ctx, bson.M{"username": username}).Decode(&profileUser)
 	if err != nil {
 		slog.Warn("user timeline profile not found", "username", username, "request_id", requestID)
@@ -139,9 +139,9 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var currUser *User
+	var currUser *types.User
 	if u := r.Context().Value("user"); u != nil {
-		val := u.(User)
+		val := u.(types.User)
 		currUser = &val
 	}
 
@@ -180,7 +180,11 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Database error", http.StatusInternalServerError)
 		return
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		if err := cursor.Close(ctx); err != nil {
+			slog.Warn("failed to close cursor", "error", err.Error(), "request_id", requestID)
+		}
+	}()
 
 	var rawResults []struct {
 		Text     string             `bson:"text"`
@@ -195,9 +199,9 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var messages []Message
+	var messages []types.Message
 	for _, raw := range rawResults {
-		msg := Message{
+		msg := types.Message{
 			Text:     raw.Text,
 			PubDate:  int(raw.PubDate),
 			Username: profileUser.Username,
@@ -207,14 +211,14 @@ func UserTimelineHandler(w http.ResponseWriter, r *http.Request) {
 
 	totalPages, prevPage, nextPage, visiblePages := app.GetPaginationInfo(totalMessages, page, app.PER_PAGE, 5)
 
-	data := TimelineUserData{
+	data := types.TimelineUserData{
 		PageTitle:    profileUser.Username + "'s Timeline",
 		PageID:       "user",
 		Messages:     messages,
 		ProfileUser:  &profileUser,
 		CurrentUser:  currUser,
 		IsFollowing:  followed,
-		Flashes:      GetFlash(w, r),
+		Flashes:      flashes.GetFlash(w, r),
 		Page:         page,
 		NextPage:     nextPage,
 		PrevPage:     prevPage,
@@ -231,13 +235,13 @@ func NotFoundHandler(w http.ResponseWriter, r *http.Request) {
 	slog.Warn("not found handler called", "path", r.URL.Path, "request_id", requestID)
 	w.WriteHeader(http.StatusNotFound)
 
-	var currUser *User
+	var currUser *types.User
 	if u := r.Context().Value("user"); u != nil {
-		val := u.(User)
+		val := u.(types.User)
 		currUser = &val
 	}
 
-	data := TimelineUserData{
+	data := types.TimelineUserData{
 		PageTitle:   "Page Not Found",
 		CurrentUser: currUser,
 	}
@@ -247,6 +251,10 @@ func NotFoundHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func PingHandler(w http.ResponseWriter, r *http.Request) {
+	requestID := requestctx.RequestIDFromRequest(r)
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+	if _, err := w.Write([]byte("OK")); err != nil {
+		slog.Error("failed to write ping response", "error", err.Error(), "request_id", requestID)
+		return
+	}
 }

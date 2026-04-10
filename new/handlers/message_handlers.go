@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"minitwit/app"
-	. "minitwit/helpers/flashes"
+	"minitwit/helpers/flashes"
 	"minitwit/helpers/requestctx"
-	. "minitwit/types"
+	"minitwit/types"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -33,7 +33,7 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	currentUser := userVal.(User)
+	currentUser := userVal.(types.User)
 	slog.Debug("message create attempt", "request_id", requestID)
 
 	text := strings.TrimSpace(r.FormValue("text"))
@@ -69,6 +69,6 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("message create successful", "request_id", requestID, "text_length", len(text), "author_id", currentUser.ID.Hex())
-	SetFlash(w, "Your message was recorded")
+	flashes.SetFlash(w, "Your message was recorded")
 	http.Redirect(w, r, "/", http.StatusFound)
 }

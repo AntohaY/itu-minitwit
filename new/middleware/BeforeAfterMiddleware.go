@@ -20,7 +20,7 @@ func BeforeAfterMiddleware(next http.Handler) http.Handler {
 
 		slog.Debug("request start", "method", r.Method, "path", r.URL.Path, "request_id", requestID)
 		ctx := requestctx.WithRequestID(r.Context(), requestID)
-		ctx = context.WithValue(ctx, "user", nil)
+		ctx = context.WithValue(ctx, userKey, nil)
 		r = r.WithContext(ctx)
 
 		// Call the next handler in the chain

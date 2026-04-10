@@ -8,7 +8,7 @@ import (
 
 	"minitwit/app"
 	"minitwit/helpers/requestctx"
-	. "minitwit/types"
+	"minitwit/types"
 
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
@@ -28,11 +28,11 @@ func FollowUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := currentUser.(User)
+	user := currentUser.(types.User)
 	username := mux.Vars(r)["username"]
 	slog.Debug("follow attempt", "username", username, "request_id", requestID)
 
-	var profileUser User
+	var profileUser types.User
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -107,11 +107,11 @@ func UnfollowUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := currentUser.(User)
+	user := currentUser.(types.User)
 	username := mux.Vars(r)["username"]
 	slog.Debug("unfollow attempt", "username", username, "request_id", requestID)
 
-	var profileUser User
+	var profileUser types.User
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

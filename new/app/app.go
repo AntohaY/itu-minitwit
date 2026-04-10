@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	. "minitwit/types"
+	"minitwit/types"
 
 	"github.com/gorilla/sessions"
 	"go.mongodb.org/mongo-driver/bson"
@@ -28,7 +28,7 @@ import (
 // Global variables - exported for use by handlers
 
 var (
-	Config      Configuration
+	Config      types.Configuration
 	DBClient    *mongo.Client
 	DB          *mongo.Database // Specific handle to the "test" database
 	Store       = sessions.NewCookieStore([]byte("development key"))
@@ -88,13 +88,13 @@ func CheckPasswordHash(password, hashedPW string) bool {
 }
 
 // GetCurrentUser extracts the current user from the request context
-func GetCurrentUser(r *http.Request) *User {
+func GetCurrentUser(r *http.Request) *types.User {
 	val := r.Context().Value("user")
 	if val == nil {
 		return nil
 	}
 
-	user, ok := val.(User)
+	user, ok := val.(types.User)
 	if !ok {
 		return nil
 	}
@@ -121,7 +121,7 @@ func RenderTemplate(w http.ResponseWriter, tmplName string, data interface{}) {
 }
 
 // QueryDatabaseForMessages retrieves public messages from the database
-func QueryDatabaseForMessages(limit int, skip int) ([]Message, error) {
+func QueryDatabaseForMessages(limit int, skip int) ([]types.Message, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -150,9 +150,12 @@ func QueryDatabaseForMessages(limit int, skip int) ([]Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
 
-	var messages []Message
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
+
+	var messages []types.Message
 
 	for cursor.Next(ctx) {
 		var result struct {
@@ -169,7 +172,7 @@ func QueryDatabaseForMessages(limit int, skip int) ([]Message, error) {
 			return nil, err
 		}
 
-		messages = append(messages, Message{
+		messages = append(messages, types.Message{
 			Text:     result.Text,
 			PubDate:  int(result.PubDate),
 			Username: result.AuthorInfo.Username,
@@ -180,7 +183,7 @@ func QueryDatabaseForMessages(limit int, skip int) ([]Message, error) {
 }
 
 // GetFollowedMessages retrieves messages from users that the given user follows
-func GetFollowedMessages(userID primitive.ObjectID, limit int, skip int) ([]Message, error) {
+func GetFollowedMessages(userID primitive.ObjectID, limit int, skip int) ([]types.Message, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -204,7 +207,7 @@ func GetFollowedMessages(userID primitive.ObjectID, limit int, skip int) ([]Mess
 			followedIDs = append(followedIDs, rel.WhomID)
 		}
 	}
-	cursor.Close(ctx)
+	_ = cursor.Close(ctx)
 
 	// 2. Query Messages with Aggregation
 	// Now we match messages where author_id is IN our list
@@ -243,9 +246,11 @@ func GetFollowedMessages(userID primitive.ObjectID, limit int, skip int) ([]Mess
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
 
-	var messages []Message
+	var messages []types.Message
 	for cursor.Next(ctx) {
 		// We decode into a temporary struct to handle the nested AuthorInfo
 		var result struct {
@@ -262,7 +267,7 @@ func GetFollowedMessages(userID primitive.ObjectID, limit int, skip int) ([]Mess
 		}
 
 		// Map to your main Message struct
-		messages = append(messages, Message{
+		messages = append(messages, types.Message{
 			Text:     result.Text,
 			PubDate:  int(result.PubDate),
 			Username: result.AuthorInfo.Username,
@@ -277,7 +282,10 @@ const logDir = "/app/logs"
 
 func LoadPreviousErrors() {
 	// Ensure the logs directory exists before doing anything
-	os.MkdirAll(logDir, os.ModePerm)
+	if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
+		slog.Warn("failed to create logs directory", "error", err.Error())
+		return
+	}
 
 	// Update the path
 	filePath := logDir + "/errors_tracker.log"
@@ -285,7 +293,11 @@ func LoadPreviousErrors() {
 	if err != nil {
 		return
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			slog.Warn("failed to close errors tracker file", "error", err.Error())
+		}
+	}()
 
 	LogMutex.Lock()
 	defer LogMutex.Unlock()
@@ -316,7 +328,10 @@ func LogFollowError(errorMessage string) {
 	slog.Warn("application error event", "message", safeMessage)
 
 	// Ensure the logs directory exists
-	os.MkdirAll(logDir, os.ModePerm)
+	if err := os.MkdirAll(logDir, os.ModePerm); err != nil {
+		slog.Warn("failed to create logs directory", "error", err.Error())
+		return
+	}
 
 	LogMutex.Lock()
 	defer LogMutex.Unlock()
@@ -330,8 +345,12 @@ func LogFollowError(errorMessage string) {
 	historyPath := logDir + "/errors_history.log"
 	fHistory, err := os.OpenFile(historyPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err == nil {
-		fmt.Fprintln(fHistory, entry)
-		fHistory.Close()
+		if _, err := fmt.Fprintln(fHistory, entry); err != nil {
+			slog.Warn("failed to write history log entry", "error", err.Error())
+		}
+		if err := fHistory.Close(); err != nil {
+			slog.Warn("failed to close history log file", "error", err.Error())
+		}
 	}
 
 	// --- FILE 2: THE DASHBOARD ---
@@ -340,11 +359,20 @@ func LogFollowError(errorMessage string) {
 	if err != nil {
 		return
 	}
-	defer fDash.Close()
+	defer func() {
+		if err := fDash.Close(); err != nil {
+			slog.Warn("failed to close dashboard log file", "error", err.Error())
+		}
+	}()
 
-	fmt.Fprintln(fDash, "=== LIVE SESSION SUMMARY ===")
+	if _, err := fmt.Fprintln(fDash, "=== LIVE SESSION SUMMARY ==="); err != nil {
+		slog.Warn("failed to write dashboard summary header", "error", err.Error())
+	}
 	for msg, count := range ErrorCounts {
-		fmt.Fprintf(fDash, "- %s: %d times\n", msg, count)
+		if _, err := fmt.Fprintf(fDash, "- %s: %d times\n", msg, count); err != nil {
+			slog.Warn("failed to write dashboard summary entry", "error", err.Error(), "message", msg)
+			break
+		}
 	}
 }
 func GetPageAndSkip(pageStr string) (int, int) {
@@ -437,7 +465,9 @@ func CountFollowedMessages(userID primitive.ObjectID) (int64, error) {
 			followedIDs = append(followedIDs, rel.WhomID)
 		}
 	}
-	cursor.Close(ctx)
+	if err := cursor.Close(ctx); err != nil {
+		slog.Warn("failed to close cursor", "error", err.Error())
+	}
 
 	// 2. Count the messages where author_id is IN our list
 	filter := bson.M{
