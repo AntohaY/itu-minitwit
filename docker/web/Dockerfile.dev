@@ -3,7 +3,9 @@ FROM golang:1.25
 
 WORKDIR /app
 
-RUN curl -sSfL https://raw.githubusercontent.com/air-verse/air/master/install.sh | sh -s -- -b $(go env GOPATH)/bin
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+RUN curl -sSfL https://raw.githubusercontent.com/air-verse/air/master/install.sh | sh -s -- -b "$(go env GOPATH)/bin"
 
 # 2. Cache dependencies
 COPY go.mod go.sum ./

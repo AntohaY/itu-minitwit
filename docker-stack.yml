@@ -25,13 +25,13 @@ services:
     logging: *syslog_logging
 
   webserver:
-    image: minitwit-webserver:local
+    image: antohay/webminitwitimage:latest
     volumes:
       - type: bind
-        source: C:/Users/anton/GolandProjects/itu-minitwit/new # Change this according to your local environment
+        source: ${PWD}/new
         target: /app
       - type: bind
-        source: C:/Users/anton/GolandProjects/itu-minitwit/new/logs # Change this according to your local environment
+        source: ${PWD}/new/logs
         target: /usr/src/app/logs
     ports:
       - "8080:8080"
@@ -39,33 +39,17 @@ services:
       - MONGO_URI=mongodb://dbserver:27017/minitwit
     networks:
       - minitwit-network
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
     logging: *syslog_logging
     deploy:
-      replicas: 2
+      replicas: 1
       # Rolling updates
       update_config:
         parallelism: 1
         delay: 10s
         order: start-first
 
-  clidownload:
-    image: curlimages/curl
-    networks:
-      - minitwit-network
-    entrypoint: sh -c "curl http://webserver:8080"
-    logging: *syslog_logging
-    deploy:
-      restart_policy:
-        condition: on-failure
-
   central-rsyslog:
-    image: central-rsyslog:local
+    image: antohay/central-rsyslog:latest
     environment:
       - RSYSLOG_RETENTION_DAYS=7
       - RSYSLOG_CLEANUP_INTERVAL_SECONDS=3600
@@ -84,7 +68,7 @@ services:
       - rsyslog_data:/var/log/remote
 
   grafana:
-    image: grafana_image:local
+    image: grafana/grafana:latest
     ports:
       - "3000:3000"
     networks:
@@ -94,7 +78,7 @@ services:
     logging: *syslog_logging
 
   prometheus:
-    image: prometheus_image:local
+    image: prom/prometheus:latest
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
     ports:
@@ -120,7 +104,7 @@ services:
         target: /var/log/remote
         read_only: true
       - type: bind
-        source: C:/Users/anton/GolandProjects/itu-minitwit/monitoring/promtail/config.yml
+        source: ${PWD}/monitoring/promtail/config.yml
         target: /etc/promtail/config.yml
         read_only: true
     command: -config.file=/etc/promtail/config.yml

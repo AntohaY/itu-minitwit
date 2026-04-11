@@ -3,14 +3,14 @@ package handlers
 import (
 	"context"
 	"log/slog"
+	"minitwit/app"
+	"minitwit/helpers"
+	"minitwit/helpers/flashes"
+	"minitwit/helpers/requestctx"
+	"minitwit/types"
 	"net/http"
 	"strings"
 	"time"
-
-	"minitwit/app"
-	. "minitwit/helpers/flashes"
-	"minitwit/helpers/requestctx"
-	. "minitwit/types"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -26,14 +26,19 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userVal := r.Context().Value("user")
+	userVal := r.Context().Value(helpers.UserContextKey)
 	if userVal == nil {
 		slog.Warn("unauthorized message create attempt", "request_id", requestID)
 		app.LogFollowError("POST ERROR: Unauthorized user tried to create a post")
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	currentUser := userVal.(User)
+	currentUser, ok := userVal.(*types.User)
+	if !ok || currentUser == nil {
+		slog.Warn("message create user assertion failed", "request_id", requestID)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 	slog.Debug("message create attempt", "request_id", requestID)
 
 	text := strings.TrimSpace(r.FormValue("text"))
@@ -69,6 +74,6 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("message create successful", "request_id", requestID, "text_length", len(text), "author_id", currentUser.ID.Hex())
-	SetFlash(w, "Your message was recorded")
+	flashes.SetFlash(w, "Your message was recorded")
 	http.Redirect(w, r, "/", http.StatusFound)
 }

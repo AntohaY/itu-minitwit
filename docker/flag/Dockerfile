@@ -6,8 +6,8 @@ FROM mcr.microsoft.com/dotnet/core/sdk:3.1 AS build
 WORKDIR /build
 # Assuming your source code is inside a flag_tool folder in your repo
 COPY /flag_tool .
-RUN dotnet restore "flag_tool.csproj"
-RUN dotnet build "flag_tool.csproj" -c Release -o /app
+RUN dotnet restore "flag_tool.csproj" && \
+dotnet build "flag_tool.csproj" -c Release -o /app
 
 # COMPILE
 FROM build AS publish

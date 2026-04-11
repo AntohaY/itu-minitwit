@@ -30,15 +30,12 @@ import (
 	_ "time/tzdata"
 
 	"minitwit/app"
+	"minitwit/db_setup"
+	"minitwit/middleware"
+	"minitwit/types"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
-
-	. "minitwit/db_setup"
-
-	. "minitwit/middleware"
-
-	. "minitwit/types"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -65,13 +62,13 @@ func main() {
 	reg.MustRegister(
 		collectors.NewGoCollector(),
 		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
-		HttpResponsesTotal,
-		HttpDuration,
+		middleware.HttpResponsesTotal,
+		middleware.HttpDuration,
 	)
 
 	app.LoadPreviousErrors()
 	mongoURI := os.Getenv("MONGO_URI")
-	app.Config = Configuration{
+	app.Config = types.Configuration{
 		Debug:     true,
 		SecretKey: "development key",
 		MongoURI:  mongoURI,
@@ -92,12 +89,12 @@ func main() {
 		Secure:   false,
 	}
 
-	app.DBClient, app.DB = ResolveClientDB(app.Config)
-	authMiddleware := AuthMiddleware(app.Store, app.DB)
+	app.DBClient, app.DB = db_setup.ResolveClientDB(app.Config)
+	authMiddleware := middleware.AuthMiddleware(app.Store, app.DB)
 
 	router := mux.NewRouter().StrictSlash(true)
 
-	router.Use(MetricsMiddleware)
+	router.Use(middleware.MetricsMiddleware)
 	router.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 
 	router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -112,7 +109,7 @@ func main() {
 		}
 
 		// 2. Handle standard Web Browser UI requests
-		// Wrap the UI handler in the auth middleware dynamically so r.Context().Value("user") still works
+		// Wrap the UI handler in the auth middleware dynamically so context.Value(helpers.UserContextKey) still works
 		uiNotFound := authMiddleware(http.HandlerFunc(handlers.NotFoundHandler))
 		uiNotFound.ServeHTTP(w, r)
 	})
@@ -138,7 +135,7 @@ func main() {
 	// 4. UI ROUTES (Web Browser)
 	// ==========================================
 	uiRouter := router.PathPrefix("/").Subrouter()
-	uiRouter.Use(BeforeAfterMiddleware)
+	uiRouter.Use(middleware.BeforeAfterMiddleware)
 	uiRouter.Use(authMiddleware)
 
 	uiRouter.HandleFunc("/", handlers.PublicTimelineHandler).Methods("GET")

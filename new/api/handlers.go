@@ -60,6 +60,12 @@ func (a *APIHandler) updateLatest(r *http.Request) {
 	}
 }
 
+func writeJSON(w http.ResponseWriter, v interface{}, requestID string) {
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		slog.Error("failed to encode JSON response", "error", err.Error(), "request_id", requestID)
+	}
+}
+
 // AuthMiddleware enforces Simulator Auth
 func (a *APIHandler) AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -75,10 +81,12 @@ func (a *APIHandler) AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			slog.Warn("api auth failed", "path", r.URL.Path, "method", r.Method, "request_id", requestID)
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusForbidden)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			if err := json.NewEncoder(w).Encode(map[string]interface{}{
 				"status":    403,
 				"error_msg": "You are not authorized to use this resource!",
-			})
+			}); err != nil {
+				slog.Error("api auth failed to encode response", "error", err.Error(), "request_id", requestID)
+			}
 			return
 		}
 		slog.Debug("api auth passed", "path", r.URL.Path, "method", r.Method, "request_id", requestID)
@@ -96,7 +104,9 @@ func (a *APIHandler) GetLatestHandler(w http.ResponseWriter, r *http.Request) {
 	slog.Debug("api get latest", "latest", val, "request_id", requestID)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]int{"latest": val})
+	if err := json.NewEncoder(w).Encode(map[string]int{"latest": val}); err != nil {
+		slog.Error("api get latest failed to encode response", "error", err.Error(), "request_id", requestID)
+	}
 }
 
 func (a *APIHandler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
@@ -114,7 +124,7 @@ func (a *APIHandler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		slog.Warn("api register bad payload", "error", err.Error(), "request_id", requestID)
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": 400, "error_msg": "Bad Request"})
+		writeJSON(w, map[string]interface{}{"status": 400, "error_msg": "Bad Request"}, requestID)
 		return
 	}
 
@@ -137,7 +147,7 @@ func (a *APIHandler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if errMsg != "" {
 		slog.Warn("api register validation failed", "reason", errMsg, "request_id", requestID)
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": 400, "error_msg": errMsg})
+		writeJSON(w, map[string]interface{}{"status": 400, "error_msg": errMsg}, requestID)
 		return
 	}
 
@@ -150,7 +160,7 @@ func (a *APIHandler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if _, err := a.DB.Collection("user").InsertOne(context.TODO(), newUser); err != nil {
 		slog.Error("api register insert failed", "error", err.Error(), "request_id", requestID)
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": 500, "error_msg": "Internal Server Error"})
+		writeJSON(w, map[string]interface{}{"status": 500, "error_msg": "Internal Server Error"}, requestID)
 		return
 	}
 	slog.Info("api register successful", "username", payload.Username, "request_id", requestID)
@@ -183,10 +193,14 @@ func (a *APIHandler) GetMessagesHandler(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		slog.Error("api get messages query failed", "error", err.Error(), "request_id", requestID)
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": 500, "error_msg": "Internal Server Error"})
+		writeJSON(w, map[string]interface{}{"status": 500, "error_msg": "Internal Server Error"}, requestID)
 		return
 	}
-	defer cursor.Close(context.TODO())
+	defer func() {
+		if closeErr := cursor.Close(context.TODO()); closeErr != nil {
+			slog.Warn("failed to close database cursor", "error", closeErr.Error(), "request_id", requestID)
+		}
+	}()
 
 	type ApiMsg struct {
 		Content string `json:"content"`
@@ -210,7 +224,7 @@ func (a *APIHandler) GetMessagesHandler(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 	slog.Debug("api get messages response", "count", len(response), "request_id", requestID)
-	json.NewEncoder(w).Encode(response)
+	writeJSON(w, response, requestID)
 }
 
 // UserMessagesHandler handles fetching and posting messages for a specific user.
@@ -230,7 +244,8 @@ func (a *APIHandler) UserMessagesHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if r.Method == http.MethodGet {
+	switch r.Method {
+	case http.MethodGet:
 		// GET: Fetch timeline for this user
 		limit := 100
 		if parsed, err := strconv.Atoi(r.URL.Query().Get("no")); err == nil {
@@ -247,7 +262,11 @@ func (a *APIHandler) UserMessagesHandler(w http.ResponseWriter, r *http.Request)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		defer cursor.Close(context.TODO())
+		defer func() {
+			if closeErr := cursor.Close(context.TODO()); closeErr != nil {
+				slog.Warn("failed to close database cursor", "error", closeErr.Error(), "request_id", requestID)
+			}
+		}()
 
 		type ApiMsg struct {
 			Content string `json:"content"`
@@ -274,9 +293,9 @@ func (a *APIHandler) UserMessagesHandler(w http.ResponseWriter, r *http.Request)
 			}
 		}
 		slog.Debug("api user messages response", "username", username, "count", len(response), "request_id", requestID)
-		json.NewEncoder(w).Encode(response)
+		writeJSON(w, response, requestID)
 
-	} else if r.Method == http.MethodPost {
+	case http.MethodPost:
 		// POST: Add a new message as this user
 		var payload struct {
 			Content string `json:"content"`
@@ -319,7 +338,8 @@ func (a *APIHandler) FollowsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if r.Method == http.MethodGet {
+	switch r.Method {
+	case http.MethodGet:
 		// GET: Fetch list of usernames this user follows
 		limit := 100
 		if parsed, err := strconv.Atoi(r.URL.Query().Get("no")); err == nil {
@@ -333,7 +353,11 @@ func (a *APIHandler) FollowsHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		defer cursor.Close(context.TODO())
+		defer func() {
+			if closeErr := cursor.Close(context.TODO()); closeErr != nil {
+				slog.Error("api follows cursor close failed", "error", closeErr.Error(), "request_id", requestID)
+			}
+		}()
 
 		follows := []string{} // Initialize as empty slice
 		for cursor.Next(context.TODO()) {
@@ -349,9 +373,9 @@ func (a *APIHandler) FollowsHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		slog.Debug("api follows list response", "username", username, "count", len(follows), "request_id", requestID)
-		json.NewEncoder(w).Encode(map[string]interface{}{"follows": follows})
+		writeJSON(w, map[string]interface{}{"follows": follows}, requestID)
 
-	} else if r.Method == http.MethodPost {
+	case http.MethodPost:
 		// POST: Follow or Unfollow
 		var payload map[string]string
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {

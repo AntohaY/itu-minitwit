@@ -5,14 +5,14 @@ import (
 	"log/slog"
 	"time"
 
-	. "minitwit/types"
+	"minitwit/types"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func ResolveClientDB(config Configuration) (*mongo.Client, *mongo.Database) {
+func ResolveClientDB(config types.Configuration) (*mongo.Client, *mongo.Database) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

@@ -3,12 +3,12 @@ package handlers
 import (
 	"context"
 	"log/slog"
+	"minitwit/app"
+	"minitwit/helpers"
+	"minitwit/helpers/requestctx"
+	"minitwit/types"
 	"net/http"
 	"time"
-
-	"minitwit/app"
-	"minitwit/helpers/requestctx"
-	. "minitwit/types"
 
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
@@ -20,7 +20,7 @@ func FollowUser(w http.ResponseWriter, r *http.Request) {
 	requestID := requestctx.RequestIDFromRequest(r)
 	slog.Debug("follow handler called", "request_id", requestID)
 
-	currentUser := r.Context().Value("user")
+	currentUser := r.Context().Value(helpers.UserContextKey)
 	if currentUser == nil {
 		slog.Warn("follow unauthorized", "request_id", requestID)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -28,11 +28,16 @@ func FollowUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := currentUser.(User)
+	user, ok := currentUser.(*types.User)
+	if !ok || user == nil {
+		slog.Warn("follow user assertion failed", "request_id", requestID)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 	username := mux.Vars(r)["username"]
 	slog.Debug("follow attempt", "username", username, "request_id", requestID)
 
-	var profileUser User
+	var profileUser types.User
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -99,7 +104,7 @@ func UnfollowUser(w http.ResponseWriter, r *http.Request) {
 	requestID := requestctx.RequestIDFromRequest(r)
 	slog.Debug("unfollow handler called", "request_id", requestID)
 
-	currentUser := r.Context().Value("user")
+	currentUser := r.Context().Value(helpers.UserContextKey)
 	if currentUser == nil {
 		slog.Warn("unfollow unauthorized", "request_id", requestID)
 		app.LogFollowError("Unauthorized user tried to unfollow without login")
@@ -107,11 +112,16 @@ func UnfollowUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := currentUser.(User)
+	user, ok := currentUser.(*types.User)
+	if !ok || user == nil {
+		slog.Warn("unfollow user assertion failed", "request_id", requestID)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 	username := mux.Vars(r)["username"]
 	slog.Debug("unfollow attempt", "username", username, "request_id", requestID)
 
-	var profileUser User
+	var profileUser types.User
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
