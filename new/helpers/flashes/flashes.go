@@ -32,4 +32,3 @@ func GetFlash(w http.ResponseWriter, r *http.Request) []string {
 
 	return []string{string(val)}
 }
-
