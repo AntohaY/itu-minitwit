@@ -35,7 +35,9 @@ def get_actions():
 
     # read scenario .csv and parse to a list of lists
     with open(CSV_FILENAME, "r", encoding="utf-8") as f:
-        reader = csv.reader(f, delimiter="\t", quotechar=None)
+        reader = csv.reader(
+            f, delimiter="\t", quoting=csv.QUOTE_NONE, escapechar="\\"
+        )
 
         # for each line in .csv
         for line in reader:
