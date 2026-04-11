@@ -27,16 +27,23 @@ func BeforeAfterMiddleware(next http.Handler) http.Handler {
 		slog.Debug("request start", "method", r.Method, "path", r.URL.Path, "request_id", requestID)
 		ctx := requestctx.WithRequestID(r.Context(), requestID)
 		var currentUser *types.User
-		session, _ := app.Store.Get(r, "minitwit-session")
-
-		if val, ok := session.Values["user_id"]; ok {
-			if userIDStr, ok := val.(string); ok {
-				oid, _ := primitive.ObjectIDFromHex(userIDStr)
-
-				user := new(types.User)
-				err := app.DB.Collection("user").FindOne(ctx, bson.M{"_id": oid}).Decode(user)
-				if err == nil {
-					currentUser = user
+		session, err := app.Store.Get(r, "minitwit-session")
+		if err != nil {
+			slog.Warn("failed to load session", "request_id", requestID, "error", err)
+		} else if val, ok := session.Values["user_id"]; ok {
+			userIDStr, ok := val.(string)
+			if !ok {
+				slog.Warn("session user_id has invalid type", "request_id", requestID)
+			} else {
+				oid, err := primitive.ObjectIDFromHex(userIDStr)
+				if err != nil {
+					slog.Warn("invalid session user_id", "request_id", requestID, "user_id", userIDStr, "error", err)
+				} else {
+					user := new(types.User)
+					err := app.DB.Collection("user").FindOne(ctx, bson.M{"_id": oid}).Decode(user)
+					if err == nil {
+						currentUser = user
+					}
 				}
 			}
 		}
