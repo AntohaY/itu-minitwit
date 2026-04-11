@@ -41,7 +41,7 @@ services:
       - minitwit-network
     logging: *syslog_logging
     deploy:
-      replicas: 2
+      replicas: 1
       # Rolling updates
       update_config:
         parallelism: 1

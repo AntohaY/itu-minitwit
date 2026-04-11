@@ -11,7 +11,7 @@ ci-setup:
 	@echo "$(CYAN)==> Starting containers in background...$(RESET)"
 	docker compose up -d --build
 	@echo "Waiting for webserver to be healthy..."
-	sleep 15 
+	sleep 30
 
 ci-cleanup:
 	@echo "$(CYAN)==> Tearing down Docker environment...$(RESET)"
@@ -20,21 +20,27 @@ ci-cleanup:
 # ---------- Tests ---------------
 
 # The Simulator: Captures output, fails fast, and reports errors
+TIMEOUT_CMD := $(shell command -v timeout || command -v gtimeout)
 test-sim:
 	@echo "$(CYAN)==> Running simulator...$(RESET)"
 	@python3 -m pip install requests --user -q
 	@tmpfile=$$(mktemp); \
-	timeout 500s python3 minitwit_simulator.py http://localhost:8080 >"$$tmpfile" 2>&1; \
+	if [ -z "$(TIMEOUT_CMD)" ]; then \
+		echo "$(RED)Warning: 'timeout' command not found. Running without timeout...$(RESET)"; \
+		python3 minitwit_simulator.py http://localhost:8080 >"$$tmpfile" 2>&1; \
+	else \
+		$(TIMEOUT_CMD) 500s python3 minitwit_simulator.py http://localhost:8080 >"$$tmpfile" 2>&1; \
+	fi; \
 	EXIT_STATUS=$$?; \
 	if [ $$EXIT_STATUS -ne 0 ]; then \
-		echo "$(RED)Simulator Failed (Exit Code: $$EXIT_STATUS)$(RESET)"; \
-		echo "--- Communication from Simulator ---"; \
-		cat "$$tmpfile"; \
-		rm -f "$$tmpfile"; \
-		exit 1; \
+	   echo "$(RED)Simulator Failed (Exit Code: $$EXIT_STATUS)$(RESET)"; \
+	   echo "--- Communication from Simulator ---"; \
+	   cat "$$tmpfile"; \
+	   rm -f "$$tmpfile"; \
+	   exit 1; \
 	else \
-		echo "$(GREEN)Simulator finished perfectly with zero errors!$(RESET)"; \
-		rm -f "$$tmpfile"; \
+	   echo "$(GREEN)Simulator finished perfectly with zero errors!$(RESET)"; \
+	   rm -f "$$tmpfile"; \
 	fi
 
 fmt:

@@ -31,9 +31,9 @@ services:
     volumes:
       - ./new:/app
       - ./new/logs:/usr/src/app/logs
-    depends_on:
-      dbserver:
-        condition: service_healthy
+#    depends_on:
+#      dbserver:
+#        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
