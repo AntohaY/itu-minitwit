@@ -10,12 +10,6 @@ on:
   workflow_dispatch:
     manual: true
 
-# Remember to set the following secrets in your repository's settings:
-# DOCKER_USERNAME
-# DOCKER_PASSWORD
-# SSH_USER
-# SSH_KEY
-# SSH_HOST
 
 jobs:
   build:
@@ -72,14 +66,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-#      - name: Test minitwit
-#        run: |
-#          docker build -t $DOCKER_USERNAME/minitwittestimage -f Dockerfile-minitwit-tests .
-#          yes 2>/dev/null | docker compose up -d
-#          docker run --rm --network=itu-minitwit-network $DOCKER_USERNAME/minitwittestimage
-#        env:
-#          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-
       - name: Configure SSH
         run: |
           mkdir -p ~/.ssh/
@@ -103,6 +89,7 @@ jobs:
           scp -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no -r remote_files/docker-stack.yml remote_files/deploy.sh remote_files/prometheus.yml query-logs.sh monitoring .env $SSH_USER@$SSH_HOST:/minitwit/
           
           ssh $SSH_USER@$SSH_HOST -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no 'chmod +x /minitwit/deploy.sh && cd /minitwit && ./deploy.sh'
+        # Take github secrets variables so they can be used in  bash script above
         env:
           SSH_USER: ${{ secrets.SSH_USER }}
           SSH_HOST: ${{ secrets.SSH_HOST }}
