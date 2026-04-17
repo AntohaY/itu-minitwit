@@ -76,7 +76,8 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - minitwit-network
-#    logging: *syslog_logging
+    volumes:
+      - loki_data:/loki
     deploy:
       placement:
         constraints:
@@ -85,8 +86,11 @@ services:
   promtail:
     image: grafana/promtail:latest
     volumes:
-      - /minitwit/monitoring/promtail/config.yml:/etc/promtail/config.yml:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    configs:
+      - source: promtail_config_v2
+        target: /etc/promtail/config.yml
     command: -config.file=/etc/promtail/config.yml
     networks:
       - minitwit-network
@@ -146,4 +150,8 @@ volumes:
     external: true
     name: minitwit_grafana_cloud_data
 
-#  rsyslog_data:
+  loki_data:
+
+configs:
+  promtail_config_v2:
+    file: ./monitoring/promtail/config.yml
