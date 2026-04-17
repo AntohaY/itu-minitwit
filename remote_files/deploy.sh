@@ -24,6 +24,11 @@ for VAR in "${REQUIRED_VARS[@]}"; do
   fi
 done
 
+docker image prune -af --filter "until=24h"
+
+# Prune stopped containers and unused networks
+docker system prune -f --volumes --filter "until=24h"
+
 echo "All critical variables are present. Proceeding with deployment..."
 
 # 3. Deploy/Update the Swarm stack immediately
