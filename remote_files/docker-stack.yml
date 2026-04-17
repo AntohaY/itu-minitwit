@@ -76,7 +76,8 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - minitwit-network
-#    logging: *syslog_logging
+    volumes:
+      - loki_data:/loki-
     deploy:
       placement:
         constraints:
@@ -147,6 +148,8 @@ volumes:
   grafana_cloud_data:
     external: true
     name: minitwit_grafana_cloud_data
+
+  loki_data:
 
 configs:
   promtail_config:
