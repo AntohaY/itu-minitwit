@@ -1,9 +1,9 @@
-x-syslog-logging: &syslog_logging
-  driver: syslog
-  options:
-    syslog-address: ${SYSLOG_ADDRESS:-udp://127.0.0.1:5514}
-    tag: "{{.Name}}"
-    syslog-format: rfc5424micro
+#x-syslog-logging: &syslog_logging
+#  driver: syslog
+#  options:
+#    syslog-address: ${SYSLOG_ADDRESS:-udp://127.0.0.1:5514}
+#    tag: "{{.Name}}"
+#    syslog-format: rfc5424micro
 
 services:
   webserver:
@@ -16,7 +16,7 @@ services:
 #      - /minitwit/new/logs:/usr/src/app/logs
     networks:
       - minitwit-network
-    logging: *syslog_logging
+#    logging: *syslog_logging
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/ping"]
       interval: 10s
@@ -44,7 +44,7 @@ services:
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
-    logging: *syslog_logging
+#    logging: *syslog_logging
     deploy:
       placement:
         constraints:
@@ -63,7 +63,7 @@ services:
       - grafana_cloud_data:/var/lib/grafana
       - /minitwit/monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
       - /minitwit/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
-    logging: *syslog_logging
+#    logging: *syslog_logging
     deploy:
       placement:
         constraints:
@@ -76,7 +76,7 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - minitwit-network
-    logging: *syslog_logging
+#    logging: *syslog_logging
     deploy:
       placement:
         constraints:
@@ -85,14 +85,13 @@ services:
   promtail:
     image: grafana/promtail:latest
     volumes:
-      - rsyslog_data:/var/log/remote:ro
       - /minitwit/monitoring/promtail/config.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
     command: -config.file=/etc/promtail/config.yml
     networks:
       - minitwit-network
-    logging: *syslog_logging
     deploy:
-      mode: global # Runs on every node to collect logs from all servers
+      mode: global
 
   discordbot:
     image: ${DOCKER_USERNAME}/discordbotimage:latest
@@ -101,33 +100,38 @@ services:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
     networks:
       - minitwit-network
-    logging: *syslog_logging
+#    logging: *syslog_logging
     deploy:
       replicas: 1
       update_config:
         parallelism: 1
         order: stop-first
+      placement:
+        constraints:
+          - node.role == manager
 
-  central-rsyslog:
-    image: ${DOCKER_USERNAME}/central-rsyslog:latest
-    environment:
-      - RSYSLOG_RETENTION_DAYS=7
-      - RSYSLOG_CLEANUP_INTERVAL_SECONDS=3600
-    ports:
-      - target: 514
-        published: 5514
-        protocol: tcp
-        mode: host
-      - target: 514
-        published: 5514
-        protocol: udp
-        mode: host
-    networks:
-      - minitwit-network
-    volumes:
-      - rsyslog_data:/var/log/remote
-    deploy:
-      mode: global # Ensures a syslog listener runs on every worker node
+#  central-rsyslog:
+#    image: ${DOCKER_USERNAME}/central-rsyslog:latest
+#    environment:
+#      - RSYSLOG_RETENTION_DAYS=7
+#      - RSYSLOG_CLEANUP_INTERVAL_SECONDS=3600
+#    ports:
+#      - target: 514
+#        published: 5514
+#        protocol: tcp
+#        mode: host
+#      - target: 514
+#        published: 5514
+#        protocol: udp
+#        mode: host
+#    networks:
+#      - minitwit-network
+#    volumes:
+#      - rsyslog_data:/var/log/remote
+#    deploy:
+#      placement:
+#        constraints:
+#          - node.role == manager
 
 networks:
   minitwit-network:
@@ -142,4 +146,4 @@ volumes:
     external: true
     name: minitwit_grafana_cloud_data
 
-  rsyslog_data:
+#  rsyslog_data:
