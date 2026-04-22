@@ -34,3 +34,37 @@ jobs:
       # Let the Makefile handle ALL the logic (Setup, Simulator, Linting, Tests, Teardown)
       - name: Run Makefile Checks
         run: make verify
+
+  ui-e2e:
+    name: UI End-to-End Test
+    runs-on: ubuntu-latest
+    needs: verify
+    env:
+      MINITWIT_GUI_URL: http://localhost:8080/register
+      MINITWIT_DB_URL: mongodb://localhost:27017/test
+      MINITWIT_HEADLESS: "1"
+      GECKODRIVER_PATH: /usr/local/bin/geckodriver
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Setup Firefox
+        uses: browser-actions/setup-firefox@v1
+
+      - name: Install geckodriver
+        run: |
+          GECKO_VERSION="v0.36.0"
+          curl -sSL -o geckodriver.tar.gz "https://github.com/mozilla/geckodriver/releases/download/${GECKO_VERSION}/geckodriver-${GECKO_VERSION}-linux64.tar.gz"
+          tar -xzf geckodriver.tar.gz
+          sudo mv geckodriver /usr/local/bin/geckodriver
+          sudo chmod +x /usr/local/bin/geckodriver
+          geckodriver --version
+
+      - name: Run UI E2E via Makefile
+        run: make ui-e2e
