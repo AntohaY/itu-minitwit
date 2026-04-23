@@ -31,7 +31,7 @@ services:
       retries: 5
       start_period: 30s
     deploy:
-      replicas: 3
+      replicas: 1
       update_config:
         parallelism: 1
         delay: 10s
