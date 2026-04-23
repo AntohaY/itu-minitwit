@@ -1,10 +1,3 @@
-x-syslog-logging: &syslog_logging
-  driver: syslog
-  options:
-    syslog-address: udp://127.0.0.1:5514
-    tag: "{{.Name}}"
-    syslog-format: rfc5424micro
-
 services:
   dbserver:
     image: mongo:8.0
@@ -22,124 +15,102 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    logging: *syslog_logging
 
   webserver:
-    build:
-      context: ./new
-      dockerfile: ../docker/web/Dockerfile.dev
-    volumes:
-      - ./new:/app
-      - ./new/logs:/usr/src/app/logs
-#    depends_on:
-#      dbserver:
-#        condition: service_healthy
+    image: ${DOCKER_USERNAME}/webminitwitimage:latest
     ports:
-      - "8080:8080"
+      - "80:8080"
     environment:
-      - MONGO_URI=mongodb://dbserver:27017/minitwit
+      - MONGO_URI=${MONGO_URI:-mongodb://dbserver:27017/minitwit}
     networks:
       - minitwit-network
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080" ]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/ping"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
-    logging: *syslog_logging
-
-  clidownload:
-    image: curlimages/curl
-    depends_on:
-      webserver:
-        condition: service_healthy
-    networks:
-      - minitwit-network
-    entrypoint: sh -c "curl http://webserver:8080"
-    logging: *syslog_logging
-
-  central-rsyslog:
-    build:
-      context: ./monitoring/rsyslog
-      dockerfile: Dockerfile
-    container_name: central-rsyslog
-    restart: unless-stopped
-    environment:
-      - RSYSLOG_RETENTION_DAYS=7
-      - RSYSLOG_CLEANUP_INTERVAL_SECONDS=3600
-    ports:
-      - "5514:514/tcp"
-      - "5514:514/udp"
-    networks:
-      - minitwit-network
-    volumes:
-      - rsyslog_data:/var/log/remote
-
-  grafana:
-    build:
-      dockerfile: ./Dockerfile
-      context: ./monitoring/grafana
-    image: grafana_image
-    container_name: grafana
-    ports:
-      - "3000:3000"
-    networks:
-      - minitwit-network
-    volumes:
-      - grafana-storage:/var/lib/grafana
-    logging: *syslog_logging
+    deploy:
+      replicas: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
 
   prometheus:
-    build:
-      dockerfile: ./Dockerfile
-      context: ./monitoring/prometheus
-    image: prometheus_image
-    container_name: prometheus
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-    ports:
-      - "9090:9090"
+    image: prom/prometheus:latest
     networks:
       - minitwit-network
-    logging: *syslog_logging
+    volumes:
+      - ./remote_files/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_cloud_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+    networks:
+      - minitwit-network
+    volumes:
+      - grafana_cloud_data:/var/lib/grafana
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
 
   loki:
     image: grafana/loki:latest
-    container_name: loki
-    ports:
-      - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - minitwit-network
-    restart: unless-stopped
-    logging: *syslog_logging
+    volumes:
+      - loki_data:/loki
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
 
   promtail:
     image: grafana/promtail:latest
-    container_name: promtail
     volumes:
-      # Mount the rsyslog data volume as read-only
-      - rsyslog_data:/var/log/remote:ro
-      # Mount the Promtail configuration file
-      - ./monitoring/promtail/config.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    configs:
+      - source: promtail_config_v2
+        target: /etc/promtail/config.yml
     command: -config.file=/etc/promtail/config.yml
     networks:
       - minitwit-network
-    restart: unless-stopped
-    logging: *syslog_logging
+    deploy:
+      mode: global
 
 #  discordbot:
-#    build:
-#      context: ./new/bot
-#      dockerfile: Dockerfile
-#    depends_on:
-#      dbserver:
-#        condition: service_healthy
+#    image: ${DOCKER_USERNAME}/discordbotimage:latest
 #    environment:
-#      - MONGO_URI=mongodb://dbserver:27017
+#      - MONGO_URI=${MONGO_URI}
 #      - DISCORD_TOKEN=${DISCORD_TOKEN}
 #    networks:
 #      - minitwit-network
+#    deploy:
+#      replicas: 1
+#      update_config:
+#        parallelism: 1
+#        order: stop-first
+#      placement:
+#        constraints:
+#          - node.role == manager
 
 networks:
   minitwit-network:
@@ -147,5 +118,15 @@ networks:
 
 volumes:
   mongo_local_data:
-  grafana-storage:
-  rsyslog_data:
+
+  prometheus_cloud_data:
+    name: minitwit_prometheus_cloud_data
+
+  grafana_cloud_data:
+    name: minitwit_grafana_cloud_data
+
+  loki_data:
+
+configs:
+  promtail_config_v2:
+    file: ./monitoring/promtail/config.yml

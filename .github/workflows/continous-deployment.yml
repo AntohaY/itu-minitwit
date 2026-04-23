@@ -48,16 +48,6 @@ jobs:
           cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/discordbotimage:botbuildcache
           cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/discordbotimage:botbuildcache,mode=max
 
-      - name: Build and push rsyslog image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./monitoring/rsyslog
-          file: ./monitoring/rsyslog/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/central-rsyslog:latest
-          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/central-rsyslog:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/central-rsyslog:buildcache,mode=max
-
   deploy:
     runs-on: ubuntu-latest
     needs: build
