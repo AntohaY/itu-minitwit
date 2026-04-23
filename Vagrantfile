@@ -27,9 +27,6 @@ Vagrant.configure("2") do |config|
 
       server.vm.hostname = droplet
 
-      server.vm.provision "shell", inline: "echo 'export DOCKER_USERNAME=\"#{ENV["DOCKER_USERNAME"]}\"' >> ~/.bash_profile"
-      server.vm.provision "shell", inline: "echo 'export DOCKER_PASSWORD=\"#{ENV["DOCKER_PASSWORD"]}\"' >> ~/.bash_profile"
-
       server.vm.provision "shell", inline: <<-SHELL
         # Prevent interactive prompts from stalling the installation
         export DEBIAN_FRONTEND=noninteractive
@@ -38,6 +35,7 @@ Vagrant.configure("2") do |config|
         cloud-init status --wait
 
         echo -e "\\nUpdating package list..."
+        sudo apt update
         sudo apt-get update
 
         echo -e "\\nInstalling docker and docker compose via official script..."
@@ -50,26 +48,36 @@ Vagrant.configure("2") do |config|
         docker run --rm hello-world
         docker rmi hello-world
 
-        echo -e "\nOpening ports for application and Docker Swarm...\n"
-        ufw allow 5000/tcp
-        ufw allow 22/tcp
+        # Allowing SSH connections
+        sudo ufw allow "OpenSSH"
 
-        # Docker Swarm Ports
-        ufw allow 2377/tcp   # Cluster management communications
-        ufw allow 7946/tcp   # Communication among nodes
-        ufw allow 7946/udp   # Communication among nodes
-        ufw allow 4789/udp   # Overlay network traffic
+        # Open the published MiniTwit HTTP port.
+        sudo ufw allow 80/tcp
+
+        # Open Grafana for external dashboard access.
+        sudo ufw allow 3000/tcp
+
+        # Enable the firewall only after SSH is allowed, otherwise provisioning
+        # risks locking us out on a fresh host.
+        sudo ufw --force enable
+
+        echo -e "\nOpening ports for Docker Swarm node communication...\n"
+
+        # Docker Swarm ports required for node-to-node communication.
+        # 2377/tcp is only needed on the manager for worker joins and cluster control.
+        if [ "#{droplet}" = "minitwit" ]; then
+          sudo ufw allow 2377/tcp
+        fi
+
+        sudo ufw allow 7946/tcp   # Communication among nodes
+        sudo ufw allow 7946/udp   # Communication among nodes
+        sudo ufw allow 4789/udp   # Overlay network traffic
 
         # Reload ufw to apply
-        ufw reload
-
-        echo ". $HOME/.bashrc" >> $HOME/.bash_profile
+        sudo ufw reload
 
         echo -e "\\nConfiguring credentials as environment variables...\\n"
         source $HOME/.bash_profile
-
-        echo -e "\\nSelecting #{droplet} Folder as default folder when you ssh into the server...\\n"
-        echo "cd /#{droplet}" >> ~/.bash_profile
 
         sudo usermod -aG docker $USER
 

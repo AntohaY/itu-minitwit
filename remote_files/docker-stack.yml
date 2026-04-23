@@ -1,10 +1,3 @@
-#x-syslog-logging: &syslog_logging
-#  driver: syslog
-#  options:
-#    syslog-address: ${SYSLOG_ADDRESS:-udp://127.0.0.1:5514}
-#    tag: "{{.Name}}"
-#    syslog-format: rfc5424micro
-
 services:
   webserver:
     image: ${DOCKER_USERNAME}/webminitwitimage:latest
@@ -12,11 +5,8 @@ services:
       - "80:8080"
     environment:
       - MONGO_URI=${MONGO_URI}
-#    volumes:
-#      - /minitwit/new/logs:/usr/src/app/logs
     networks:
       - minitwit-network
-#    logging: *syslog_logging
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/ping"]
       interval: 10s
@@ -34,8 +24,6 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
-    ports:
-      - "9090:9090"
     networks:
       - minitwit-network
     volumes:
@@ -44,7 +32,6 @@ services:
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
-#    logging: *syslog_logging
     deploy:
       placement:
         constraints:
@@ -63,7 +50,6 @@ services:
       - grafana_cloud_data:/var/lib/grafana
       - /minitwit/monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
       - /minitwit/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
-#    logging: *syslog_logging
     deploy:
       placement:
         constraints:
@@ -71,8 +57,6 @@ services:
 
   loki:
     image: grafana/loki:latest
-    ports:
-      - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - minitwit-network
@@ -104,7 +88,6 @@ services:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
     networks:
       - minitwit-network
-#    logging: *syslog_logging
     deploy:
       replicas: 1
       update_config:
@@ -113,29 +96,6 @@ services:
       placement:
         constraints:
           - node.role == manager
-
-#  central-rsyslog:
-#    image: ${DOCKER_USERNAME}/central-rsyslog:latest
-#    environment:
-#      - RSYSLOG_RETENTION_DAYS=7
-#      - RSYSLOG_CLEANUP_INTERVAL_SECONDS=3600
-#    ports:
-#      - target: 514
-#        published: 5514
-#        protocol: tcp
-#        mode: host
-#      - target: 514
-#        published: 5514
-#        protocol: udp
-#        mode: host
-#    networks:
-#      - minitwit-network
-#    volumes:
-#      - rsyslog_data:/var/log/remote
-#    deploy:
-#      placement:
-#        constraints:
-#          - node.role == manager
 
 networks:
   minitwit-network:
