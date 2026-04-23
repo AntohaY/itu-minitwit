@@ -25,6 +25,8 @@ RUN apk --no-cache add ca-certificates && \
 
 WORKDIR /usr/src/app
 
+RUN mkdir -p /app && chown -R appuser:appgroup /app /usr/src/app
+
 # Change ownership to the non-root user
 COPY --from=builder --chown=appuser:appgroup /usr/src/app/minitwit-server .
 COPY --from=builder --chown=appuser:appgroup /usr/src/app/templates/ ./templates/

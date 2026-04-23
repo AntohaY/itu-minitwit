@@ -6,6 +6,7 @@ RESET  := $(shell tput -Txterm sgr0)
 
 GO_DIR=new
 DOCKER_FILES=$(shell find . -name "Dockerfile*")
+GECKODRIVER_BIN=$(shell command -v geckodriver 2>/dev/null)
 
 ci-setup:
 	@echo "$(CYAN)==> Starting containers in background...$(RESET)"
@@ -62,6 +63,42 @@ test:
 	@echo "$(CYAN)==> Running Go unit tests...$(RESET)"
 	cd $(GO_DIR) && go test -v ./...
 
+wait-web:
+	@echo "$(CYAN)==> Waiting for webserver readiness on /register...$(RESET)"
+	@for i in $$(seq 1 45); do \
+		status=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/register || true); \
+		if [ "$$status" = "200" ]; then \
+			echo "$(GREEN)Webserver is ready.$(RESET)"; \
+			exit 0; \
+		fi; \
+		echo "waiting... ($$i/45) status=$$status"; \
+		sleep 2; \
+	done; \
+	echo "$(RED)Webserver did not become ready in time.$(RESET)"; \
+	exit 1
+
+ui-e2e:
+	@echo "$(CYAN)==> Running UI end-to-end tests...$(RESET)"
+	@set -e; \
+	GECKO_PATH="$${GECKODRIVER_PATH:-$(GECKODRIVER_BIN)}"; \
+	if [ -z "$$GECKO_PATH" ]; then \
+		echo "$(RED)geckodriver not found. Set GECKODRIVER_PATH or install geckodriver in PATH.$(RESET)"; \
+		exit 1; \
+	fi; \
+	python3 -m pip install -r requirements-test.txt; \
+	docker compose up -d --force-recreate dbserver webserver; \
+	trap 'docker compose down -v' EXIT; \
+	$(MAKE) wait-web; \
+	MINITWIT_GUI_URL="$${MINITWIT_GUI_URL:-http://localhost:8080/register}" \
+	MINITWIT_DB_URL="$${MINITWIT_DB_URL:-mongodb://localhost:27017/test}" \
+	MINITWIT_HEADLESS="$${MINITWIT_HEADLESS:-1}" \
+	GECKODRIVER_PATH="$$GECKO_PATH" \
+	python3 -m pytest -v test_itu_minitwit_ui.py || { \
+		echo "$(RED)UI E2E test failed; printing container logs...$(RESET)"; \
+		docker compose logs --tail=120 webserver dbserver || true; \
+		exit 1; \
+	}
+
 # --------- Execute tests --------------------------
 
 # if one test file, still environment is cleaned up correctly
@@ -74,4 +111,4 @@ verify:
 # Helper to group all checks together
 run-checks: test-sim fmt lint-go lint-docker test
 
-.PHONY: ci-setup test-sim fmt lint-go lint-docker test verify ci-cleanup run-checks
+.PHONY: ci-setup test-sim fmt lint-go lint-docker test verify ci-cleanup run-checks wait-web ui-e2e

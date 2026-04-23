@@ -9,20 +9,21 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  - job_name: central_rsyslog
+  - job_name: docker
     static_configs:
       - targets:
           - localhost
         labels:
-          job: rsyslog
-          __path__: /var/log/remote/*/*.log
+          job: docker
+          __path__: /var/lib/docker/containers/*/*-json.log
+
     pipeline_stages:
-      # 1. Look at the file path and extract the host and service names
+      - json:
+          expressions:
+            log: log
+            stream: stream
+            time: time
       - regex:
           source: filename
-          expression: "^/var/log/remote/(?P<host>[^/]+)/(?P<service>[^/]+)\\.log$"
-
-      # 2. Turn those extracted variables into official Loki labels
-      - labels:
-          host:
-          service:
+          expression: ".*/containers/(?P<container_id>[^/]+)/.*"
+      - docker: {}
