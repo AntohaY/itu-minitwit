@@ -90,3 +90,39 @@ jobs:
           DIGITAL_OCEAN_DATABASE_USERNAME: ${{ secrets.DIGITAL_OCEAN_DATABASE_USERNAME }}
           DIGITAL_OCEAN_DATABASE_PWD: ${{ secrets.DIGITAL_OCEAN_DATABASE_PWD }}
           DIGITAL_OCEAN_DATABASE_NAME: ${{ secrets.DIGITAL_OCEAN_DATABASE_NAME }}
+
+      - name: Post-deploy TLS verification
+        run: |
+          if [ -z "${TLS_DOMAIN:-}" ]; then
+            echo "TLS_DOMAIN is not set. Skipping post-deploy TLS verification."
+            exit 0
+          fi
+
+          DOMAIN="${TLS_DOMAIN}"
+
+          echo "Running remote Nginx/certificate checks on $SSH_HOST..."
+          ssh $SSH_USER@$SSH_HOST -i ~/.ssh/ssh_key_golang_minitwit -o StrictHostKeyChecking=no '
+            set -e
+            sudo nginx -t
+            sudo systemctl is-active nginx >/dev/null
+            sudo certbot certificates
+          '
+
+          echo "Validating HTTP -> HTTPS redirect for ${DOMAIN}..."
+          HTTP_HEADERS=$(curl -sSI "http://${DOMAIN}")
+          echo "$HTTP_HEADERS"
+          echo "$HTTP_HEADERS" | grep -Ei '^HTTP/.* (301|308)'
+          echo "$HTTP_HEADERS" | grep -Ei '^location: https://'
+
+          echo "Validating HTTPS availability for ${DOMAIN}..."
+          HTTPS_HEADERS=$(curl -sSI "https://${DOMAIN}")
+          echo "$HTTPS_HEADERS"
+          echo "$HTTPS_HEADERS" | grep -Ei '^HTTP/.* (200|301|302)'
+
+          echo "Validating certificate chain for ${DOMAIN}..."
+          CERT_CHECK=$(echo | openssl s_client -connect "${DOMAIN}:443" -servername "${DOMAIN}" 2>/dev/null)
+          echo "$CERT_CHECK" | grep "Verify return code: 0"
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          TLS_DOMAIN: ${{ secrets.TLS_DOMAIN }}
