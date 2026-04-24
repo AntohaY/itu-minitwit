@@ -81,16 +81,12 @@ services:
     image: prom/prometheus:latest
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
-    ports:
-      - "9090:9090"
     networks:
       - minitwit-network
     logging: *syslog_logging
 
   loki:
     image: grafana/loki:latest
-    ports:
-      - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - minitwit-network
