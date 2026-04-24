@@ -115,7 +115,7 @@ jobs:
           echo "$HTTP_HEADERS" | grep -Ei '^location: https://'
 
           echo "Validating HTTPS availability for ${DOMAIN}..."
-          HTTPS_HEADERS=$(curl -sSI "https://${DOMAIN}")
+          HTTPS_HEADERS=$(curl -sSI "https://${DOMAIN}/ping")
           echo "$HTTPS_HEADERS"
           echo "$HTTPS_HEADERS" | grep -Ei '^HTTP/.* (200|301|302)'
 
