@@ -38,6 +38,51 @@ jobs:
           cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/webminitwitimage:buildcache
           cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/webminitwitimage:buildcache,mode=max
 
+      -Yes, exactly! But you don't need to create a whole new job. You just need to add it as a new step inside your existing build job.
+
+Since your pipeline builds two images (the web image and the bot image), the best practice is to scan the image right after it gets built.
+
+Here is exactly where to put it. You will paste this new step immediately after your Build and push web image step, and right before the Build and push bot image step.
+The Updated build Job
+YAML
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 1. Build the Web Image
+      - name: Build and push web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/web/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/webminitwitimage:latest
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/webminitwitimage:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/webminitwitimage:buildcache,mode=max
+
+      # Scanning vulnerabilities in the Web Image right after it's built
+      - name: Docker Scout Scan Web Image
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: ${{ secrets.DOCKER_USERNAME }}/webminitwitimage:latest
+          only-severities: critical,high
+          exit-code: true
+
       - name: Build and push bot image
         uses: docker/build-push-action@v6
         with:
