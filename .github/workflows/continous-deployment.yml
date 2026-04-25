@@ -38,6 +38,14 @@ jobs:
           cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/webminitwitimage:buildcache
           cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/webminitwitimage:buildcache,mode=max
 
+      - name: Docker Scout Scan Web Image
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: ${{ secrets.DOCKER_USERNAME }}/webminitwitimage:latest
+          only-severities: critical,high
+          exit-code: true  
+
       - name: Build and push bot image
         uses: docker/build-push-action@v6
         with:
