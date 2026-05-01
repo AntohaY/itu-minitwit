@@ -18,7 +18,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: 'new/go.mod'
+          go-version-file: 'src/go.mod'
 
       - name: Setup Python
         uses: actions/setup-python@v5

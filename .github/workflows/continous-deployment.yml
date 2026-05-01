@@ -41,8 +41,8 @@ jobs:
       - name: Build and push bot image
         uses: docker/build-push-action@v6
         with:
-          context: ./new/bot
-          file: ./new/bot/Dockerfile
+          context: ./src/bot
+          file: ./src/bot/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/discordbotimage:latest
           cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/discordbotimage:botbuildcache

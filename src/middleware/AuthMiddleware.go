@@ -38,7 +38,7 @@ func AuthMiddleware(store *sessions.CookieStore, db *mongo.Database) func(http.H
 
 				if err == nil {
 					ctx := context.WithValue(r.Context(), helpers.UserContextKey, currentUser) // we create updated context
-					r = r.WithContext(ctx)                                                     // update the request with the new context
+					r = r.WithContext(ctx)                                                     // update the request with the src context
 				} else {
 					slog.Warn("failed to resolve user from session", "request_id", requestID)
 				}

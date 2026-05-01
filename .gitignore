@@ -35,8 +35,8 @@ coverage.out
 # Go runtime/temp files
 # --------------------
 tmp/
-new/tmp/
-new/minitwit
+src/tmp/
+src/minitwit
 flag_tool
 
 # --------------------
@@ -62,6 +62,9 @@ itu-minitwit
 .env.prod
 .env
 .vagrant
+.env
+.vagrant/*
+.vagrant/machines/*
 
 # --------------------
 # Testing / coverage

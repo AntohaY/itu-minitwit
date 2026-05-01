@@ -4,7 +4,7 @@ GREEN  := $(shell tput -Txterm setaf 2)
 CYAN   := $(shell tput -Txterm setaf 6)
 RESET  := $(shell tput -Txterm sgr0)
 
-GO_DIR=new
+GO_DIR=src
 DOCKER_FILES=$(shell find . -name "Dockerfile*")
 GECKODRIVER_BIN=$(shell command -v geckodriver 2>/dev/null)
 
