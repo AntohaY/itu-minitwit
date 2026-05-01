@@ -64,9 +64,9 @@ test:
 	cd $(GO_DIR) && go test -v ./...
 
 wait-web:
-	@echo "$(CYAN)==> Waiting for webserver readiness on /register...$(RESET)"
+	@echo "$(CYAN)==> Waiting for webserver readiness on /register_user...$(RESET)"
 	@for i in $$(seq 1 45); do \
-		status=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/register || true); \
+		status=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/register_user || true); \
 		if [ "$$status" = "200" ]; then \
 			echo "$(GREEN)Webserver is ready.$(RESET)"; \
 			exit 0; \
@@ -89,7 +89,7 @@ ui-e2e:
 	docker compose up -d --force-recreate dbserver webserver; \
 	trap 'docker compose down -v' EXIT; \
 	$(MAKE) wait-web; \
-	MINITWIT_GUI_URL="$${MINITWIT_GUI_URL:-http://localhost:8080/register}" \
+	MINITWIT_GUI_URL="$${MINITWIT_GUI_URL:-http://localhost:8080/register_user}" \
 	MINITWIT_DB_URL="$${MINITWIT_DB_URL:-mongodb://localhost:27017/test}" \
 	MINITWIT_HEADLESS="$${MINITWIT_HEADLESS:-1}" \
 	GECKODRIVER_PATH="$$GECKO_PATH" \

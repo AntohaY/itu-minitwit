@@ -30,11 +30,11 @@ from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.firefox.options import Options
 
 
-GUI_URL = os.getenv("MINITWIT_GUI_URL", "http://localhost:8080/register")
+GUI_URL = os.getenv("MINITWIT_GUI_URL", "http://localhost:8080/register_user")
 DB_URL = os.getenv("MINITWIT_DB_URL", "mongodb://localhost:27017/test")
 GECKODRIVER_PATH = os.getenv("GECKODRIVER_PATH", "./geckodriver")
 HEADLESS = os.getenv("MINITWIT_HEADLESS", "1").strip().lower() not in {"0", "false", "no"}
-BASE_URL = GUI_URL.rsplit("/register", 1)[0]
+BASE_URL = GUI_URL.rsplit("/register_user", 1)[0]
 
 
 def _unique_token(prefix):
@@ -63,7 +63,7 @@ def _register_user_via_gui(driver, data):
     driver.find_element(By.NAME, "password").send_keys(data[2])
     driver.find_element(By.NAME, "password2").send_keys(data[3])
 
-    driver.find_element(By.CSS_SELECTOR, "form[action='/register'] button[type='submit']").click()
+    driver.find_element(By.CSS_SELECTOR, "form[action='/register_user'] button[type='submit']").click()
 
     wait.until(EC.url_contains("/login"))
     return driver.current_url
@@ -194,7 +194,7 @@ def test_register_duplicate_username_validation():
             driver.find_element(By.NAME, "email").send_keys(f"{username}@example.test")
             driver.find_element(By.NAME, "password").send_keys("secure123")
             driver.find_element(By.NAME, "password2").send_keys("secure123")
-            driver.find_element(By.CSS_SELECTOR, "form[action='/register'] button[type='submit']").click()
+            driver.find_element(By.CSS_SELECTOR, "form[action='/register_user'] button[type='submit']").click()
 
             wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".alert")))
             assert "The username is already taken" in driver.page_source
