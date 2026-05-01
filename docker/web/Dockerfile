@@ -19,7 +19,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o minitwit-server main.g
 # ==========================================
 FROM alpine:3.19
 # Install CA certificates and set up a non-root user
-# hadolint ignore=DL3018
 RUN apk --no-cache add ca-certificates && \
     addgroup -S appgroup && adduser -S appuser -G appgroup
 
