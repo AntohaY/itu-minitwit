@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: verify
     env:
-      MINITWIT_GUI_URL: http://localhost:8080/register
+      MINITWIT_GUI_URL: http://localhost:8080/register_user
       MINITWIT_DB_URL: mongodb://localhost:27017/test
       MINITWIT_HEADLESS: "1"
       GECKODRIVER_PATH: /usr/local/bin/geckodriver
