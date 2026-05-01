@@ -60,6 +60,9 @@ itu-minitwit
 .env.local
 .env.dev
 .env.prod
+.env
+.vagrant/*
+.vagrant/machines/*
 
 # --------------------
 # Testing / coverage
