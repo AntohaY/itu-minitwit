@@ -4,12 +4,12 @@
 FROM golang:1.25 AS builder
 WORKDIR /usr/src/app
 
-# Cache dependencies first (Assuming go.mod is inside 'new/')
-COPY new/go.mod new/go.sum ./
+# Cache dependencies first (Assuming go.mod is inside 'src/')
+COPY src/go.mod src/go.sum ./
 RUN go mod download
 
 # Now copy the rest of the code
-COPY new/ .
+COPY src/ .
 
 # Build the Go binary securely for Linux
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o minitwit-server main.go

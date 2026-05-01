@@ -296,7 +296,7 @@ func (a *APIHandler) UserMessagesHandler(w http.ResponseWriter, r *http.Request)
 		writeJSON(w, response, requestID)
 
 	case http.MethodPost:
-		// POST: Add a new message as this user
+		// POST: Add a src message as this user
 		var payload struct {
 			Content string `json:"content"`
 		}

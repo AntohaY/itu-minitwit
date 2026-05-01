@@ -15,7 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// RegisterHandler manages user sign-ups by validating form data and saving new users to the DB.
+// RegisterHandler manages user sign-ups by validating form data and saving src users to the DB.
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

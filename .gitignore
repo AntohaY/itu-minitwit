@@ -35,8 +35,8 @@ coverage.out
 # Go runtime/temp files
 # --------------------
 tmp/
-new/tmp/
-new/minitwit
+src/tmp/
+src/minitwit
 flag_tool
 
 # --------------------
