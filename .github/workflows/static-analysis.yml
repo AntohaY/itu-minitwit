@@ -25,11 +25,11 @@ jobs:
         with:
           python-version: '3.10'
 
-      # Install the LATEST linter so it understands Go 1.23 syntax
       - name: Install golangci-lint
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin latest
-          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.11
+          install-only: true
 
       # Let the Makefile handle ALL the logic (Setup, Simulator, Linting, Tests, Teardown)
       - name: Run Makefile Checks
