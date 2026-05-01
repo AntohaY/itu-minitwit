@@ -28,10 +28,10 @@ services:
     image: antohay/webminitwitimage:latest
     volumes:
       - type: bind
-        source: ${PWD}/new
+        source: ${PWD}/src
         target: /app
       - type: bind
-        source: ${PWD}/new/logs
+        source: ${PWD}/src/logs
         target: /usr/src/app/logs
     ports:
       - "8080:8080"
