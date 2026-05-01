@@ -17,6 +17,10 @@ services:
       start_period: 30s
 
   webserver:
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+    pull_policy: never
     image: ${DOCKER_USERNAME:-antohay}/webminitwitimage:latest
     ports:
       - "8080:8080"

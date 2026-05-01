@@ -61,6 +61,8 @@ itu-minitwit
 .env.dev
 .env.prod
 .env
+.vagrant
+.env
 .vagrant/*
 .vagrant/machines/*
 
