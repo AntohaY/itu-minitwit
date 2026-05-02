@@ -28,6 +28,7 @@ fi
 echo "Installing Nginx and Certbot..."
 apt-get update
 apt-get install -y nginx certbot python3-certbot-nginx
+systemctl enable --now nginx
 
 echo "Configuring firewall (ufw) if available..."
 if command -v ufw >/dev/null 2>&1; then
@@ -65,7 +66,7 @@ nginx -t
 systemctl reload nginx
 
 echo "Requesting TLS certificate from Let's Encrypt..."
-certbot --nginx -d "${DOMAIN}" -d "www.${DOMAIN}" --non-interactive --agree-tos -m "${EMAIL}" --redirect
+certbot --nginx -d "${DOMAIN}" -d "www.${DOMAIN}" --non-interactive --agree-tos -m "${EMAIL}" --redirect --keep-until-expiring
 
 echo "Testing cert renewal (dry run)..."
 certbot renew --dry-run
