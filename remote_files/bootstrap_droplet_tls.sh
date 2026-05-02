@@ -28,6 +28,7 @@ fi
 echo "Installing Nginx and Certbot..."
 apt-get update
 apt-get install -y nginx certbot python3-certbot-nginx
+systemctl enable --now nginx
 
 echo "Configuring firewall (ufw) if available..."
 if command -v ufw >/dev/null 2>&1; then
@@ -44,6 +45,22 @@ server {
     listen [::]:80;
 
     server_name ${SERVER_NAME};
+
+    location = /grafana {
+        return 301 /grafana/;
+    }
+
+    location /grafana/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host \$http_host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host \$host;
+        proxy_set_header X-Forwarded-Prefix /grafana;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
 
     location / {
         proxy_pass http://127.0.0.1:${APP_UPSTREAM_PORT};
@@ -65,7 +82,7 @@ nginx -t
 systemctl reload nginx
 
 echo "Requesting TLS certificate from Let's Encrypt..."
-certbot --nginx -d "${DOMAIN}" -d "www.${DOMAIN}" --non-interactive --agree-tos -m "${EMAIL}" --redirect
+certbot --nginx -d "${DOMAIN}" -d "www.${DOMAIN}" --non-interactive --agree-tos -m "${EMAIL}" --redirect --keep-until-expiring
 
 echo "Testing cert renewal (dry run)..."
 certbot renew --dry-run
