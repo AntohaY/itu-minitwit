@@ -1,7 +1,7 @@
 # ==========================================
 # STAGE 1: Build the app
 # ==========================================
-FROM golang:1.25 AS builder
+FROM golang:1.25.9 AS builder
 WORKDIR /usr/src/app
 
 # Cache dependencies first (Assuming go.mod is inside 'src/')
@@ -17,7 +17,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o minitwit-server main.g
 # ==========================================
 # STAGE 2: Create the production image
 # ==========================================
-FROM alpine:3.19
+FROM alpine:3.23
 # Install CA certificates and set up a non-root user
 RUN apk --no-cache add ca-certificates=20250911-r0 && \
     addgroup -S appgroup && adduser -S appuser -G appgroup
