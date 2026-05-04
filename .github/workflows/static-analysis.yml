@@ -35,6 +35,24 @@ jobs:
       - name: Run Makefile Checks
         run: make verify
 
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Semgrep Security Scan
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/owasp-top-ten
+            p/golang
+          generateSarif: true
+        continue-on-error: true
+
   ui-e2e:
     name: UI End-to-End Test
     runs-on: ubuntu-latest
