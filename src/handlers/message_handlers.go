@@ -15,7 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-// AddMessageHandler handles posting new messages
+// AddMessageHandler handles posting src messages
 func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 	requestID := requestctx.RequestIDFromRequest(r)
 	slog.Debug("message create handler called", "method", r.Method, "request_id", requestID)

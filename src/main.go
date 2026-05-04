@@ -86,7 +86,7 @@ func main() {
 		Path:     "/",
 		MaxAge:   86400 * 7,
 		HttpOnly: true,
-		Secure:   false,
+		Secure:   true,
 	}
 
 	app.DBClient, app.DB = db_setup.ResolveClientDB(app.Config)
@@ -122,9 +122,7 @@ func main() {
 
 	router.HandleFunc("/latest", apiHandler.GetLatestHandler).Methods("GET")
 
-	// The "Headers" matcher ensures JSON requests go to the API, not UI
-	router.HandleFunc("/register", apiHandler.RegisterHandler).Methods("POST").
-		HeadersRegexp("Content-Type", "application/json.*")
+	router.HandleFunc("/register", apiHandler.RegisterHandler).Methods("POST")
 
 	// Wrapping the protected API endpoints with the API's specific Basic Auth middleware
 	router.HandleFunc("/msgs", apiHandler.AuthMiddleware(apiHandler.GetMessagesHandler)).Methods("GET")
@@ -140,7 +138,7 @@ func main() {
 
 	uiRouter.HandleFunc("/", handlers.PublicTimelineHandler).Methods("GET")
 	uiRouter.HandleFunc("/login", handlers.LoginHandler)
-	uiRouter.HandleFunc("/register", handlers.RegisterHandler)
+	uiRouter.HandleFunc("/register_user", handlers.RegisterHandler).Methods("GET", "POST")
 
 	uiRouter.HandleFunc("/ping", handlers.PingHandler)
 

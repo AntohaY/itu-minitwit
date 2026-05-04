@@ -4,12 +4,12 @@
 FROM golang:1.25.9 AS builder
 WORKDIR /usr/src/app
 
-# Cache dependencies first (Assuming go.mod is inside 'new/')
-COPY new/go.mod new/go.sum ./
+# Cache dependencies first (Assuming go.mod is inside 'src/')
+COPY src/go.mod src/go.sum ./
 RUN go mod download
 
 # Now copy the rest of the code
-COPY new/ .
+COPY src/ .
 
 # Build the Go binary securely for Linux
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o minitwit-server main.go
@@ -19,8 +19,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o minitwit-server main.g
 # ==========================================
 FROM alpine:3.23
 # Install CA certificates and set up a non-root user
-# hadolint ignore=DL3018
-RUN apk --no-cache add ca-certificates && \
+RUN apk --no-cache add ca-certificates=20250911-r0 && \
     addgroup -S appgroup && adduser -S appuser -G appgroup
 
 WORKDIR /usr/src/app

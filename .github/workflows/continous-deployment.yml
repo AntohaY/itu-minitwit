@@ -49,8 +49,8 @@ jobs:
       - name: Build and push bot image
         uses: docker/build-push-action@v6
         with:
-          context: ./new/bot
-          file: ./new/bot/Dockerfile
+          context: ./src/bot
+          file: ./src/bot/Dockerfile
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/discordbotimage:latest
           cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/discordbotimage:botbuildcache
@@ -123,7 +123,7 @@ jobs:
           echo "$HTTP_HEADERS" | grep -Ei '^location: https://'
 
           echo "Validating HTTPS availability for ${DOMAIN}..."
-          HTTPS_HEADERS=$(curl -sSI "https://${DOMAIN}")
+          HTTPS_HEADERS=$(curl -sSI "https://${DOMAIN}/ping")
           echo "$HTTPS_HEADERS"
           echo "$HTTPS_HEADERS" | grep -Ei '^HTTP/.* (200|301|302)'
 
