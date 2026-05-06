@@ -36,7 +36,11 @@ docker volume create minitwit_grafana_cloud_data >/dev/null
 docker image prune -af --filter "until=24h"
 
 # Prune stopped containers and unused networks
-docker system prune -f --volumes --filter "until=24h"
+docker system prune -f --filter "until=24h"
+
+# Prune unused volumes separately because some Docker versions do not
+# support combining --volumes with the until filter on system prune.
+docker volume prune -f
 
 echo "All critical variables are present. Proceeding with deployment..."
 
