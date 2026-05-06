@@ -16,5 +16,11 @@ Naming convention:
 ### 2. Run this command to start docker
     docker compose up --build
 
+#### 2.1 Update commands for routing, nginx, etc.
+    vagrant rsync
+    export TLS_DOMAIN=your-domain.com
+    export TLS_EMAIL=you@example.com
+    ./setup-swarm.sh
+
 ### 3. API test
 To test API you can use _test-api-routes.sh_ script.
