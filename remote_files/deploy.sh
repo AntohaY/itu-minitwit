@@ -1,6 +1,12 @@
-#!/bin/bash
-source ~/.bash_profile
-cd /minitwit
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+if [ ! -f .env ]; then
+  echo "ERROR: Missing .env in $(pwd). Aborting deployment."
+  exit 1
+fi
 
 # 1. Safely load and export variables
 set -a
@@ -23,6 +29,9 @@ for VAR in "${REQUIRED_VARS[@]}"; do
     exit 1
   fi
 done
+
+docker volume create minitwit_prometheus_cloud_data >/dev/null
+docker volume create minitwit_grafana_cloud_data >/dev/null
 
 docker image prune -af --filter "until=24h"
 
