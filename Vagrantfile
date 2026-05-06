@@ -25,6 +25,14 @@ Vagrant.configure("2") do |config|
       server.vm.synced_folder "remote_files", "/#{droplet}", type: "rsync"
       server.vm.synced_folder '.', '/vagrant', disabled: true
 
+      if droplet == "minitwit"
+        server.vm.synced_folder "monitoring", "/minitwit/monitoring", type: "rsync"
+
+        if File.exist?(".env")
+          server.vm.synced_folder ".env", "/minitwit/.env", type: "rsync"
+        end
+      end
+
       server.vm.hostname = droplet
 
       server.vm.provision "shell", inline: <<-SHELL
@@ -83,5 +91,13 @@ Vagrant.configure("2") do |config|
 
       SHELL
     end
+  end
+
+  config.trigger.after :up do |trigger|
+    trigger.name = "Configure swarm and deploy MiniTwit"
+    trigger.only_on = "minitwit-web-2"
+    trigger.run = {
+      path: "setup-swarm.sh"
+    }
   end
 end
