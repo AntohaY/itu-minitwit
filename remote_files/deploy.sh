@@ -3,15 +3,15 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-if [ ! -f .env ]; then
-  echo "ERROR: Missing .env in $(pwd). Aborting deployment."
-  exit 1
+if [ -f .env ]; then
+  echo "Loading deployment variables from $(pwd)/.env..."
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+else
+  echo "No .env file found in $(pwd). Using already-exported environment variables."
 fi
-
-# 1. Safely load and export variables
-set -a
-source .env
-set +a
 
 # 2. PRE-Launch CHECK: Ensure critical variables are not empty
 REQUIRED_VARS=(
