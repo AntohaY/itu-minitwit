@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source ~/.bash_profile
 cd "$(dirname "$0")"
 
-if [ ! -f .env ]; then
-  echo "ERROR: Missing .env in $(pwd). Aborting deployment."
-  exit 1
+if [ -f .env ]; then
+  echo "Loading deployment variables from $(pwd)/.env..."
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+else
+  echo "No .env file found in $(pwd). Using already-exported environment variables."
 fi
-
-# 1. Safely load and export variables
-set -a
-source .env
-set +a
 
 # 2. PRE-Launch CHECK: Ensure critical variables are not empty
 REQUIRED_VARS=(
@@ -37,7 +36,11 @@ docker volume create minitwit_grafana_cloud_data >/dev/null
 docker image prune -af --filter "until=24h"
 
 # Prune stopped containers and unused networks
-docker system prune -f --volumes --filter "until=24h"
+docker system prune -f --filter "until=24h"
+
+# Prune unused volumes separately because some Docker versions do not
+# support combining --volumes with the until filter on system prune.
+docker volume prune -f
 
 echo "All critical variables are present. Proceeding with deployment..."
 
