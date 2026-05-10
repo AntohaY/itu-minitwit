@@ -94,6 +94,7 @@ func main() {
 
 	router := mux.NewRouter().StrictSlash(true)
 
+	router.Use(middleware.BeforeAfterMiddleware)
 	router.Use(middleware.MetricsMiddleware)
 	router.Handle("/metrics", promhttp.HandlerFor(reg, promhttp.HandlerOpts{}))
 
@@ -133,7 +134,6 @@ func main() {
 	// 4. UI ROUTES (Web Browser)
 	// ==========================================
 	uiRouter := router.PathPrefix("/").Subrouter()
-	uiRouter.Use(middleware.BeforeAfterMiddleware)
 	uiRouter.Use(authMiddleware)
 
 	uiRouter.HandleFunc("/", handlers.PublicTimelineHandler).Methods("GET")
