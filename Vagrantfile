@@ -27,10 +27,6 @@ Vagrant.configure("2") do |config|
 
       if droplet == "minitwit"
         server.vm.synced_folder "monitoring", "/minitwit/monitoring", type: "rsync"
-
-        if File.exist?(".env")
-          server.vm.synced_folder ".env", "/minitwit/.env", type: "rsync"
-        end
       end
 
       server.vm.hostname = droplet

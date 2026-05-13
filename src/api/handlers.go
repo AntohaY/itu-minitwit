@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -333,8 +334,28 @@ func (a *APIHandler) FollowsHandler(w http.ResponseWriter, r *http.Request) {
 	var profileUser User
 	err := a.DB.Collection("user").FindOne(context.TODO(), bson.M{"username": username}).Decode(&profileUser)
 	if err != nil {
-		slog.Warn("api follows profile not found", "username", username, "request_id", requestID)
-		w.WriteHeader(http.StatusNotFound)
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			slog.Warn(
+				"api follows profile lookup failed",
+				"reason", "user_not_found",
+				"username", username,
+				"method", r.Method,
+				"path", r.URL.Path,
+				"request_id", requestID,
+			)
+			w.WriteHeader(http.StatusNotFound)
+		} else {
+			slog.Error(
+				"api follows profile lookup failed",
+				"reason", "db_error",
+				"username", username,
+				"method", r.Method,
+				"path", r.URL.Path,
+				"error", err.Error(),
+				"request_id", requestID,
+			)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -387,7 +408,7 @@ func (a *APIHandler) FollowsHandler(w http.ResponseWriter, r *http.Request) {
 		// Check if the payload is a "follow" request
 		if followTarget, ok := payload["follow"]; ok {
 			var target User
-			if a.DB.Collection("user").FindOne(context.TODO(), bson.M{"username": followTarget}).Decode(&target) == nil {
+			if err := a.DB.Collection("user").FindOne(context.TODO(), bson.M{"username": followTarget}).Decode(&target); err == nil {
 				if _, err := a.DB.Collection("follower").InsertOne(context.TODO(), bson.M{
 					"who_id":  profileUser.ID,
 					"whom_id": target.ID,
@@ -398,14 +419,36 @@ func (a *APIHandler) FollowsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				slog.Info("api follow successful", "username", username, "target", followTarget, "request_id", requestID)
 			} else {
-				slog.Warn("api follow target not found", "username", username, "target", followTarget, "request_id", requestID)
-				w.WriteHeader(http.StatusNotFound)
+				if errors.Is(err, mongo.ErrNoDocuments) {
+					slog.Warn(
+						"api follow target lookup failed",
+						"reason", "user_not_found",
+						"username", username,
+						"target", followTarget,
+						"method", r.Method,
+						"path", r.URL.Path,
+						"request_id", requestID,
+					)
+					w.WriteHeader(http.StatusNotFound)
+				} else {
+					slog.Error(
+						"api follow target lookup failed",
+						"reason", "db_error",
+						"username", username,
+						"target", followTarget,
+						"method", r.Method,
+						"path", r.URL.Path,
+						"error", err.Error(),
+						"request_id", requestID,
+					)
+					w.WriteHeader(http.StatusInternalServerError)
+				}
 				return
 			}
 			// Check if the payload is an "unfollow" request
 		} else if unfollowTarget, ok := payload["unfollow"]; ok {
 			var target User
-			if a.DB.Collection("user").FindOne(context.TODO(), bson.M{"username": unfollowTarget}).Decode(&target) == nil {
+			if err := a.DB.Collection("user").FindOne(context.TODO(), bson.M{"username": unfollowTarget}).Decode(&target); err == nil {
 				if _, err := a.DB.Collection("follower").DeleteOne(context.TODO(), bson.M{
 					"who_id":  profileUser.ID,
 					"whom_id": target.ID,
@@ -416,8 +459,30 @@ func (a *APIHandler) FollowsHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				slog.Info("api unfollow successful", "username", username, "target", unfollowTarget, "request_id", requestID)
 			} else {
-				slog.Warn("api unfollow target not found", "username", username, "target", unfollowTarget, "request_id", requestID)
-				w.WriteHeader(http.StatusNotFound)
+				if errors.Is(err, mongo.ErrNoDocuments) {
+					slog.Warn(
+						"api unfollow target lookup failed",
+						"reason", "user_not_found",
+						"username", username,
+						"target", unfollowTarget,
+						"method", r.Method,
+						"path", r.URL.Path,
+						"request_id", requestID,
+					)
+					w.WriteHeader(http.StatusNotFound)
+				} else {
+					slog.Error(
+						"api unfollow target lookup failed",
+						"reason", "db_error",
+						"username", username,
+						"target", unfollowTarget,
+						"method", r.Method,
+						"path", r.URL.Path,
+						"error", err.Error(),
+						"request_id", requestID,
+					)
+					w.WriteHeader(http.StatusInternalServerError)
+				}
 				return
 			}
 		} else {

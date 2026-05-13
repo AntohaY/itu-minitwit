@@ -188,6 +188,47 @@ request() {
   fi
 }
 
+request_raw() {
+  local method="$1"
+  local path="$2"
+  local expected_status="$3"
+  local auth_mode="$4"
+  local body="${5:-}"
+  local content_type="${6:-application/json}"
+
+  local -a curl_cmd
+  curl_cmd=(curl -sS -o "$BODY_FILE" -D "$HEADER_FILE" -X "$method" -H "Accept: application/json")
+
+  if [[ "$INSECURE" -eq 1 ]]; then
+    curl_cmd+=(-k)
+  fi
+
+  if [[ "$auth_mode" == "auth" ]]; then
+    curl_cmd+=(-u "${AUTH_USER}:${AUTH_PASS}")
+  fi
+
+  if [[ -n "$body" ]]; then
+    curl_cmd+=(-H "Content-Type: ${content_type}" --data "$body")
+  fi
+
+  curl_cmd+=("${BASE_URL}${path}")
+
+  local status
+  status="$("${curl_cmd[@]}" -w '%{http_code}')"
+  CURRENT_STATUS="$status"
+  CURRENT_BODY="$(cat "$BODY_FILE")"
+  CURRENT_CONTENT_TYPE="$(awk 'BEGIN{IGNORECASE=1} /^Content-Type:/ {sub(/\r$/, "", $2); print $2; exit}' "$HEADER_FILE")"
+
+  print_response "$status" "$method" "$path" "$CURRENT_CONTENT_TYPE"
+
+  if [[ "$status" != "$expected_status" ]]; then
+    if [[ "$path" == /register* ]] && [[ "$status" == "200" || "$status" == "302" || "$CURRENT_CONTENT_TYPE" == text/html* ]]; then
+      echo "hint: /register may have been handled by the UI route instead of the JSON API route." >&2
+    fi
+    fail "Expected HTTP $expected_status but got $status for $method $path"
+  fi
+}
+
 assert_body_contains() {
   local needle="$1"
   if [[ "$CURRENT_BODY" != *"$needle"* ]]; then
@@ -238,6 +279,12 @@ run_write_tests() {
 
   request POST "/register?latest=$(next_latest)" "204" "auth" "{\"username\":\"${user_one}\",\"email\":\"${email_one}\",\"pwd\":\"secret123\"}"
   request POST "/register?latest=$(next_latest)" "204" "auth" "{\"username\":\"${user_two}\",\"email\":\"${email_two}\",\"pwd\":\"secret123\"}"
+  request POST "/register?latest=$(next_latest)" "400" "auth" "{\"username\":\"${user_one}\",\"email\":\"${email_one}\",\"pwd\":\"secret123\"}"
+  assert_body_contains "already taken"
+  request POST "/register?latest=$(next_latest)" "400" "auth" "{\"username\":\"${PREFIX}_${suffix}_invalid\",\"email\":\"not-an-email\",\"pwd\":\"secret123\"}"
+  assert_body_contains "valid email"
+  request_raw POST "/register?latest=$(next_latest)" "400" "auth" "{\"username\":\"broken-json\"" "application/json"
+  assert_body_contains "Bad Request"
 
   request GET "/msgs?latest=$(next_latest)&no=5" "200" "auth"
 
