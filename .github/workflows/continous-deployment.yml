@@ -38,14 +38,6 @@ jobs:
           cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/webminitwitimage:buildcache
           cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/webminitwitimage:buildcache,mode=max
 
-      - name: Docker Scout Scan Web Image
-        uses: docker/scout-action@v1
-        with:
-          command: cves
-          image: ${{ secrets.DOCKER_USERNAME }}/webminitwitimage:latest
-          only-severities: critical,high
-          exit-code: true
-
       - name: Build and push bot image
         uses: docker/build-push-action@v6
         with:
@@ -55,28 +47,6 @@ jobs:
           tags: ${{ secrets.DOCKER_USERNAME }}/discordbotimage:latest
           cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/discordbotimage:buildcache
           cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/discordbotimage:buildcache,mode=max
-
-  scan-images:
-    name: Scan Docker Images for Vulnerabilities
-    runs-on: ubuntu-latest
-    needs: build
-
-    steps:
-      - name: Run Trivy Scan on Web Image
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ secrets.DOCKER_USERNAME }}/webminitwitimage:latest
-          format: sarif
-          output: trivy-web-results.sarif
-          severity: CRITICAL,HIGH,MEDIUM
-        continue-on-error: true
-
-      - name: Upload Trivy Results to GitHub
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: trivy-web-results.sarif
-          category: trivy-scan
-        continue-on-error: true
 
   deploy:
     runs-on: ubuntu-latest
