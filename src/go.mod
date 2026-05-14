@@ -6,7 +6,6 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/sessions v1.4.0
 	github.com/prometheus/client_golang v1.23.2
-	go.mongodb.org/mongo-driver v1.17.9
 	golang.org/x/crypto v0.48.0
 )
 
