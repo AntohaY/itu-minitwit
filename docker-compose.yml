@@ -40,7 +40,7 @@ services:
         parallelism: 1
         delay: 10s
         order: start-first
-
+      
   prometheus:
     image: prom/prometheus:latest
     networks:
