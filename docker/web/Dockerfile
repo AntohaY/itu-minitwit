@@ -1,7 +1,7 @@
 # ==========================================
 # STAGE 1: Build the app
 # ==========================================
-FROM golang:1.25.9 AS builder
+FROM golang:1.25.10 AS builder
 WORKDIR /usr/src/app
 
 # Cache dependencies first (Assuming go.mod is inside 'src/')
