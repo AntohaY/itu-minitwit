@@ -1,5 +1,5 @@
 # bot/Dockerfile
-FROM golang:1.25
+FROM golang:1.25.10 as builder
 WORKDIR /app
 
 COPY go.mod go.sum ./
