@@ -40,9 +40,6 @@ services:
         parallelism: 1
         delay: 10s
         order: start-first
-    build:
-      context: .
-      dockerfile: docker/web/Dockerfile
       
   prometheus:
     image: prom/prometheus:latest
