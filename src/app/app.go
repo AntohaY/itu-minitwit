@@ -9,7 +9,6 @@ import (
 	"html/template"
 	"log/slog"
 	"math"
-	"minitwit/helpers"
 	"minitwit/helpers/logsanitize"
 	"net/http"
 	"os"
@@ -95,23 +94,6 @@ func HashPassword(password string) (string, error) {
 // CheckPasswordHash compares a plain password against a bcrypt hash.
 func CheckPasswordHash(password, hashedPW string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hashedPW), []byte(password)) == nil
-}
-
-// GetCurrentUser extracts the current user from the request context
-func GetCurrentUser(r *http.Request) *types.User {
-	val := r.Context().Value(helpers.UserContextKey)
-	if val == nil {
-		return nil
-	}
-
-	switch u := val.(type) {
-	case *types.User:
-		return u
-	case types.User:
-		return &u
-	default:
-		return nil
-	}
 }
 
 // RenderTemplate renders an HTML template with the given data
@@ -283,7 +265,6 @@ func GetFollowedMessages(userID primitive.ObjectID, limit int, skip int) ([]type
 			Text:     result.Text,
 			PubDate:  int(result.PubDate),
 			Username: result.AuthorInfo.Username,
-			//Email:    result.AuthorInfo.Email, // Ensure your Message struct has this field
 		})
 	}
 
@@ -398,20 +379,6 @@ func GetPageAndSkip(pageStr string) (int, int) {
 	// Calculate skip for pagination
 	skip := (page - 1) * PER_PAGE
 	return skip, page
-}
-
-func CalculateNextPage(totalMessages int64, page int) (int, int) {
-	nextPage := -1
-	if totalMessages > int64(page*PER_PAGE) {
-		nextPage = page + 1
-	}
-
-	prevPage := -1
-	if page > 1 {
-		prevPage = page - 1
-	}
-
-	return nextPage, prevPage
 }
 
 func GetPaginationInfo(totalItems int64, currentPage int, perPage int, maxVisible int) (totalPages, prevPage, nextPage int, visiblePages []int) {
