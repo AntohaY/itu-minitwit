@@ -44,7 +44,9 @@ jobs:
           command: cves
           image: ${{ secrets.DOCKER_USERNAME }}/webminitwitimage:latest
           only-severities: critical,high
-          exit-code: true  
+          exit-code: true
+          dockerhub-password: ${{ secrets.DOCKER_PASSWORD }}
+          dockerhub-user: ${{ secrets.DOCKER_USERNAME }}
 
       - name: Build and push bot image
         uses: docker/build-push-action@v6
