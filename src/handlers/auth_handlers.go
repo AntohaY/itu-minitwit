@@ -46,11 +46,16 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		} else if app.GetUserID(username) != primitive.NilObjectID {
 			errMsg = "The username is already taken"
 		} else {
+			hashedPW, err := app.HashPassword(password)
+			if err != nil {
+				slog.Error("failed to hash password", "error", err.Error(), "request_id", requestID)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				return
+			}
 			newUser := types.User{
 				Username: username,
 				Email:    email,
-				PW:       password,
-				HashedPW: password,
+				HashedPW: hashedPW,
 			}
 			if _, err := app.DB.Collection("user").InsertOne(ctx, newUser); err != nil {
 				slog.Error("registration database error", "error", err.Error(), "request_id", requestID)
@@ -112,7 +117,29 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 				slog.Error("login database error", "error", dberr.Error(), "request_id", requestID)
 			}
 		} else {
-			if !app.CheckPasswordHash(password, foundUser.HashedPW) {
+			authenticated := false
+
+			if foundUser.HashedPW == password {
+				// Legacy plaintext password — migrate to bcrypt on first login
+				if hashedPW, hashErr := app.HashPassword(password); hashErr == nil {
+					_, updateErr := app.DB.Collection("user").UpdateOne(ctx,
+						bson.M{"_id": foundUser.ID},
+						bson.M{"$set": bson.M{"hashedpw": hashedPW}, "$unset": bson.M{"pw": ""}},
+					)
+					if updateErr != nil {
+						slog.Warn("failed to migrate password hash", "error", updateErr.Error(), "request_id", requestID)
+					} else {
+						slog.Info("migrated password to bcrypt hash", "username", username, "request_id", requestID)
+					}
+				} else {
+					slog.Warn("failed to hash password during migration", "error", hashErr.Error(), "request_id", requestID)
+				}
+				authenticated = true
+			} else if app.CheckPasswordHash(password, foundUser.HashedPW) {
+				authenticated = true
+			}
+
+			if !authenticated {
 				slog.Warn("login failed", "reason", "invalid_password", "request_id", requestID)
 				flashes = append(flashes, "Invalid password")
 			} else {

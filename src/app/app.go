@@ -24,6 +24,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Global variables - exported for use by handlers
@@ -82,10 +83,18 @@ func GravatarURL(email string) string {
 	return fmt.Sprintf("http://www.gravatar.com/avatar/%s?d=identicon&s=%d", hashString, 80)
 }
 
-// CheckPasswordHash compares a plain password with a hashed password
+// HashPassword returns a bcrypt hash of the given password.
+func HashPassword(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
+}
+
+// CheckPasswordHash compares a plain password against a bcrypt hash.
 func CheckPasswordHash(password, hashedPW string) bool {
-	// TODO: implement proper password hashing comparison
-	return password == hashedPW
+	return bcrypt.CompareHashAndPassword([]byte(hashedPW), []byte(password)) == nil
 }
 
 // GetCurrentUser extracts the current user from the request context
