@@ -37,7 +37,8 @@ jobs:
       - name: Build Web Image
         uses: docker/build-push-action@v6
         with:
-          context: ./docker/web/Dockerfile
+          context: .
+          file: ./docker/web/Dockerfile
           push: false
           tags: webminitwitimage:latest
           load: true
