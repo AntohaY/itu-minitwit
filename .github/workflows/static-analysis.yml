@@ -10,6 +10,9 @@ jobs:
   verify:
     name: Build and Verify
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
 
     steps:
       - name: Checkout Code
@@ -37,7 +40,7 @@ jobs:
           command: cves
           image: ${{ secrets.DOCKER_USERNAME }}/webminitwitimage:latest
           only-severities: critical,high
-          exit-code: true  
+          exit-code: true
 
       - name: Install golangci-lint
         uses: golangci/golangci-lint-action@v9
