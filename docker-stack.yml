@@ -1,10 +1,3 @@
-x-syslog-logging: &syslog_logging
-  driver: syslog
-  options:
-    syslog-address: udp://127.0.0.1:5514
-    tag: "{{.Name}}"
-    syslog-format: rfc5424micro
-
 services:
   dbserver:
     image: mongo:8.0
@@ -22,7 +15,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    logging: *syslog_logging
 
   webserver:
     image: antohay/webminitwitimage:latest
@@ -39,7 +31,6 @@ services:
       - MONGO_URI=mongodb://dbserver:27017/minitwit
     networks:
       - minitwit-network
-    logging: *syslog_logging
     deploy:
       replicas: 1
       # Rolling updates
@@ -75,7 +66,6 @@ services:
       - minitwit-network
     volumes:
       - grafana_cloud_data:/var/lib/grafana
-    logging: *syslog_logging
 
   prometheus:
     image: prom/prometheus:latest
@@ -83,14 +73,12 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
     networks:
       - minitwit-network
-    logging: *syslog_logging
 
   loki:
     image: grafana/loki:latest
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - minitwit-network
-    logging: *syslog_logging
 
   promtail:
     image: grafana/promtail:latest
@@ -106,7 +94,6 @@ services:
     command: -config.file=/etc/promtail/config.yml
     networks:
       - minitwit-network
-    logging: *syslog_logging
 
 networks:
   minitwit-network:
