@@ -37,24 +37,27 @@ The `.placeholder.md` files are temporary collection notes. Replace each placeho
 9. `tls-certificate-proof.png`  
    Browser certificate view, TLS verification output, or screenshot proving HTTPS certificate validity.
 
+10. `observability-flow.png`
+    Diagram showing metrics and logs separately: `/metrics -> Prometheus -> Grafana` and Docker logs -> Promtail -> Loki -> Grafana.
+
 ### Optional
 
-10. `ui-public-timeline.png`  
+11. `ui-public-timeline.png`
     Browser screenshot of the public timeline.
 
-11. `ui-auth-flow.png`  
+12. `ui-auth-flow.png`
     Browser screenshot covering registration/login flow.
 
-12. `ui-message-follow-flow.png`  
+13. `ui-message-follow-flow.png`
     Browser screenshot covering posting and follow/unfollow behavior.
 
-13. `docker-hub-images.png`  
+14. `docker-hub-images.png`
     Docker Hub image repository screenshot showing deployed image names/tags.
 
-14. `github-actions-success.png`  
+15. `github-actions-success.png`
     GitHub Actions screenshot showing successful CI/release/deployment runs.
 
-15. `security-scan-results.png`  
+16. `security-scan-results.png`
     Semgrep/Trivy workflow or security tab screenshot showing current scan results.
 
 ## Collection Rules

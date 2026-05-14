@@ -84,7 +84,7 @@ Source: `docs/ci-cd.md`
 ### Known Gaps
 
 - **Security scans are advisory rather than blocking.**  
-  Semgrep and Trivy both use `continue-on-error: true`, and the deploy job depends on `build`, not `scan-images`. This means security findings are feedback for review rather than hard deployment gates.
+  Semgrep and Trivy both use `continue-on-error: true`, and the deploy job depends on `build`, not `scan-images`. This means security findings are feedback for review rather than hard deployment gates. The team confirmed this was intentional to keep scans advisory during the course workload.
 
 ### Needs Team Evidence
 
@@ -98,6 +98,7 @@ Source: `docs/ci-cd.md`
 
 - **Decision on advisory versus blocking security scans.**  
   **Evidence collected:** PR #148 explicitly added Semgrep and Trivy in warning/non-blocking mode, so the report should frame them as advisory security feedback loops unless the workflow is changed: https://github.com/AntohaY/itu-minitwit/pull/148.
+  Team answer collected: Semgrep and Trivy are intended to be advisory, not blocking, because the team wanted security feedback without adding extra delivery risk during later course work.
 
 =====
 
@@ -133,7 +134,7 @@ Source: `docs/deployment.md`
 ### Needs Team Evidence
 
 - **Production URL.**  
-  **Partly evidenced:** PR #132 documents the registered domain `itu-minitwit.me`, DNS setup, and TLS bootstrap/verification work: https://github.com/AntohaY/itu-minitwit/pull/132. Current reachability, DNS resolution, and HTTPS certificate validity still need a recent browser, `curl`, or workflow-log result.
+  **Partly evidenced:** PR #132 documents the registered domain `itu-minitwit.me`, DNS setup, and TLS bootstrap/verification work: https://github.com/AntohaY/itu-minitwit/pull/132. Team answer collected: production app URL is `https://itu-minitwit.me`, Grafana is served from `https://itu-minitwit.me/grafana`, and logs are available through the Grafana log section. Current reachability, DNS resolution, and HTTPS certificate validity still need a recent browser, `curl`, or workflow-log result.
   Evidence to collect: browser screenshot of the production site, `curl -I https://itu-minitwit.me/ping`, DNS lookup output, and certificate verification output or successful Actions TLS verification log.
 
 - **Docker Hub or image registry link.**  
@@ -207,7 +208,7 @@ Source: `docs/logging.md`
 ### Needs Team Evidence
 
 - **Which logging path is actually deployed.**  
-  **Partly evidenced:** PR #113 added rsyslog-to-Promtail/Loki work, while later deployment changes removed the central rsyslog service from the remote stack and use Promtail against Docker logs. The team should confirm which path is actually running now: https://github.com/AntohaY/itu-minitwit/pull/113.
+  **Evidence collected:** PR #113 added earlier rsyslog-to-Promtail/Loki work, while later deployment changes removed the central rsyslog service from the remote stack and use Promtail against Docker logs. The team confirmed production uses Promtail/Loki directly; remaining rsyslog references are legacy or confusing leftovers.
   Evidence to collect: `docker service ls`, `docker stack ps minitwit`, and Promtail/Loki service output showing whether production uses direct Promtail Docker-log scraping or rsyslog.
 
 - **Logging screenshots or query examples.**  
@@ -235,7 +236,7 @@ Source: `docs/monitoring.md`
 ### Needs Team Evidence
 
 - **Dashboard URLs for monitoring and logging.**  
-  Confirm the current Grafana URL, including where to see metrics dashboards and where to inspect Loki logs. Needed for report links, course URL registration, and `misc_urls.py`.
+  **Evidence collected:** Team answer collected: Grafana is served from `https://itu-minitwit.me/grafana`, and logs are visible through the Grafana log section. Needed for report links, course URL registration, and `misc_urls.py`.
   Evidence to collect: current Grafana URL, dashboard URLs, and log Explore URL if shareable without credentials; otherwise sanitized screenshots and the URL pattern.
 
 - **Dashboard screenshots.**  
@@ -259,7 +260,7 @@ Source: `docs/operations.md`
 ### Needs Team Evidence
 
 - **Current production runtime evidence.**  
-  Combine evidence for deployed infrastructure and stack health here: current droplet status, recent deployment workflow run, production smoke-test output, `docker service ls`, `docker service ps`, `docker stack ps minitwit`, proof of 3 web replicas, proof that declared services such as `webserver`, `prometheus`, `grafana`, `loki`, `promtail`, and `discordbot` are running, and evidence that Prometheus is scraping the production service.
+  **Partly evidenced:** Team answer collected: the deployment runs 3 web replicas across one manager and two worker nodes, and the team says this can be proven. Combine evidence for deployed infrastructure and stack health here: current droplet status, recent deployment workflow run, production smoke-test output, `docker service ls`, `docker service ps`, `docker stack ps minitwit`, proof of 3 web replicas, proof that declared services such as `webserver`, `prometheus`, `grafana`, `loki`, `promtail`, and `discordbot` are running, and evidence that Prometheus is scraping the production service.
   Evidence to collect: DigitalOcean droplet screenshot, latest deployment Actions run, `docker node ls`, `docker service ls`, `docker service ps minitwit_webserver`, `docker stack ps minitwit`, `curl -I <production-url>/ping`, and Prometheus target screenshot.
 
 - **Production commands used by the team.**  
@@ -357,7 +358,7 @@ Source: `docs/security.md`
   Evidence to collect: `sudo ufw status verbose` from the production host, cloud firewall screenshot if DigitalOcean firewall is used, and any Nginx/Grafana exposure evidence.
 
 - **Decision on plaintext passwords.**  
-  The team should either fix password hashing or explicitly state it as a known limitation.
+  **Evidence collected:** Team answer collected: password hashing should be fixed before the final submission rather than only documented as a limitation.
   Evidence to collect: fix PR/commit if password hashing is implemented, or an issue/ADR/report note explicitly accepting it as a known limitation.
 
 =====
@@ -437,12 +438,12 @@ These are cross-cutting because they support oral exam questions like “why did
 
 ## Highest-Priority Meeting Questions
 
-- [ ] Are we fixing password hashing before final hand-in, or documenting it as a limitation?
-- [ ] Are Semgrep and Trivy supposed to block deployment, or are they advisory?
-- [ ] Which logging path is actually active in production: Promtail/Loki directly or rsyslog-based collection?
-- [ ] Is `/latest` being in memory acceptable with 3 replicas, or should it be stored centrally?
-- [ ] What are the real production URLs for app, Grafana, and logs?
-- [ ] Can we prove the current deployment is running with 3 web replicas?
+- [x] Are we fixing password hashing before final hand-in, or documenting it as a limitation? We will fix it for the final submission.
+- [x] Are Semgrep and Trivy supposed to block deployment, or are they advisory? They are advisory. The team understands security gates are important, but decided to keep them non-blocking during later course work to reduce delivery risk.
+- [x] Which logging path is actually active in production: Promtail/Loki directly or rsyslog-based collection? Promtail/Loki directly. Remaining rsyslog references are likely legacy/confusing code.
+- [ ] Is `/latest` being in memory acceptable with 3 replicas, or should it be stored centrally? The current production layout has one manager node and two worker nodes with 3 web replicas. This confirms the replica concern exists; the team still needs to decide whether to accept the limitation or store `/latest` centrally.
+- [x] What are the real production URLs for app, Grafana, and logs? Production app: `https://itu-minitwit.me`. Grafana: `https://itu-minitwit.me/grafana`. Logs are available from the Grafana log section.
+- [ ] Can we prove the current deployment is running with 3 web replicas? Team answer: yes. Still collect `docker service ls` / `docker service ps minitwit_webserver` / `docker stack ps minitwit` output as proof.
 - [ ] What was our biggest operational incident or deployment problem?
 - [ ] Which PRs/commits/issues should the report cite for the reflection section?
 - [ ] What exact commands do we use for production troubleshooting and rollback?
