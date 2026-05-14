@@ -33,3 +33,29 @@ Document the provisioning approach.
 
 Describe positive and negative consequences.
 
+=====
+
+## Project Facts
+
+- Vagrant provisions DigitalOcean droplets.
+- The configured droplets are `minitwit`, `minitwit-web-1`, and `minitwit-web-2`.
+- Provisioning installs Docker, enables UFW, and opens required ports.
+- `setup-swarm.sh` initializes the manager and joins workers to Docker Swarm.
+- Optional TLS bootstrap is handled by `remote_files/bootstrap_droplet_tls.sh`.
+- Deployment files are synced from `remote_files/`.
+
+### Evidence
+
+- `Vagrantfile`
+- `setup-swarm.sh`
+- `remote_files/bootstrap_droplet_tls.sh`
+- `remote_files/deploy.sh`
+- `remote_files/docker-stack.yml`
+- PR #147 updated Vagrant/setup scripts for one-line setup direction and Swarm/TLS deployment automation: https://github.com/AntohaY/itu-minitwit/pull/147
+- PR #132 added domain/TLS bootstrap work for `itu-minitwit.me`: https://github.com/AntohaY/itu-minitwit/pull/132
+
+### Needs Team Evidence
+
+- DigitalOcean token, SSH key, DNS records, GitHub Secrets, Docker Hub credentials, and production database provisioning remain manual.
+- The team should explain why Vagrant/scripts were chosen instead of Terraform or fully manual setup.
+- Need evidence from a successful `vagrant up` or current infrastructure state for the report.

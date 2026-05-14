@@ -65,3 +65,45 @@ Examples:
 - The project preserves the core MiniTwit user flows through a web UI.
 - UI behavior is covered by automated tests where practical.
 
+=====
+
+## Project Facts
+
+### What We Implemented
+
+- The browser UI is served by the Go web application on the same port as the API.
+- UI templates are Go HTML templates under `src/templates/`.
+- Static assets are served from `/static/`.
+- Styling uses Bootstrap from a CDN plus project CSS in `src/static/style.css`.
+- The implemented UI routes include `/`, `/login`, `/register_user`, `/timeline`, `/logout`, `/user/{username}`, `/user/follow/{username}`, `/user/unfollow/{username}`, `/add_message`, and `/ping`.
+- The UI supports registration, login, logout, public timeline, personal timeline, user timelines, follow/unfollow, and posting messages.
+- Sessions use Gorilla sessions with a cookie store.
+- The session cookie is configured as `HttpOnly` and `Secure`.
+- The 404 page is rendered from `src/templates/404.html`.
+
+### Evidence in the Repository
+
+- `src/main.go`
+- `src/templates/layout.html`
+- `src/templates/login.html`
+- `src/templates/register.html`
+- `src/templates/timeline.html`
+- `src/templates/404.html`
+- `src/static/style.css`
+- `src/handlers/auth_handlers.go`
+- `src/handlers/timeline_handlers.go`
+- `src/handlers/follow_handlers.go`
+- `src/handlers/message_handlers.go`
+- `test_itu_minitwit_ui.py`
+- PR #131 added Selenium/Pytest UI/E2E coverage for registration, login/logout, duplicate username validation, posting, and follow/unfollow flows: https://github.com/AntohaY/itu-minitwit/pull/131.
+
+### Known Gaps / Needs Team Evidence
+
+- `src/templates/timeline.html` contains visible placeholder/joke text such as `Public Timeline Really really good` and `SHREEEEEEEK`; the team should decide whether to keep or polish this before final submission.
+- Password handling is not secure because credentials are stored as plain strings.
+- The app uses Bootstrap from a CDN, so frontend rendering depends on external CDN availability.
+- Need screenshots if the report wants to show the UI; automated flow coverage is evidenced by PR #131, but screenshots are still useful for report presentation.
+
+### Oral Exam Answer
+
+The UI preserves the MiniTwit workflows through Go templates and standard web forms. It supports account registration, login/logout, timelines, posting, and follow/unfollow behavior, with Selenium/Pytest tests covering important user flows. The UI is functional, but some visible placeholder text and weak password handling should be treated as known limitations.
