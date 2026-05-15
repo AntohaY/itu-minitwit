@@ -2,7 +2,7 @@
 
 **![](images/itu_logo.jpg)**  
 
-# <center>Report group P</center>
+<h1 align="center">Report group P</h1>
 <ul>
     <li><h3>Anton Yakovenko anya@itu.dk</h3></li>
     <li><h3>Janusz Bekas jdbe@itu.dk</h3></li>
@@ -21,8 +21,13 @@ The project’s codebase is located on GitHub and utilizes GitHub Actions for CI
 
 ## System perspective
 
-**![](images/sys_arch_img.png)**  
-<center>System architecture view</center>
+<div align="center">
+
+![](images/sys_arch_img.png)
+
+<p><em>System architecture view</em></p>
+
+</div>
 
 The production runtime is Docker Swarm on DigitalOcean. The Swarm has one manager node, minitwit, and two worker nodes, minitwit-web-1 and minitwit-web-2. The remote stack consists of webserver, prometheus, grafana, loki, promtail, and discordbot services on the overlay network minitwit-network. Manager node consists of a monitoring stack (prometheus, grafana, loki, a promtail replica and webserver replica). Worker nodes have webserver replicas and promtail replicas.
 
@@ -168,9 +173,9 @@ Our CI/CD pipeline ensures security and quality at every stage before deployment
 - Request / success / error rate by different endpoints   
 -   
     
-* **Logging**  
+**Logging**  
   We are logging failures for different endpoints inside webserver containers. We use promtail to go through the docker container logs and aggregate them for grafana.  
-* **Security**  
+**Security**  
   We added following following technologies:   
 - **UFW Firewall (Perimeter Defense):** The host firewall is strictly configured to deny unauthorized external traffic. Public access is restricted entirely to secure management via OpenSSH and encrypted web traffic via the `Nginx Full` profile (which opens HTTP Port 80 and HTTPS Port 443).   
 - **Nginx & HTTPS:** Nginx acts as a reverse proxy, buffering the public internet from our internal services. All data in transit is fully encrypted using HTTPS (SSL/TLS).  
@@ -179,7 +184,7 @@ Our CI/CD pipeline ensures security and quality at every stage before deployment
 - Our docker container images are running as a non-root user except for promtail. We kept promtail user as a root, because it needs more rights to read logs from other containers.
 
 
-* **Scaling and availability**  
+**Scaling and availability**  
   We have implemented docker swarm to help with scaling. Furthermore, we are using rolling updates to reduce down time as much as possible. We have 3 replicas for webserver images and a promtail replica for each of webservers to gather all the necessary logs.
 
 <div style="page-break-after: always;"></div>
