@@ -1,5 +1,14 @@
   
-**Report group P**
+
+**![](images/itu_logo.jpg)**  
+
+<h1>Report group P</h1>
+<ul>
+    <li><h3>Anton Yakovenko anya@itu.dk</h3></li>
+    <li><h3>Janusz Bekas jdbe@itu.dk</h3></li>
+    <li><h3>Mengdi Liao menl@itu.dk</h3></li>
+    <li><h3>Viktor Horvath vhor@itu.dk</h3></li>
+</ul>
 
 **Introduction**
 
@@ -26,96 +35,96 @@ Necessary environment variables are stored in GitHub Secrets.
 
 **Dependencies**
 
-\*\*Higher-Level Dependencies\*\*  
-\- \*\*DigitalOcean Droplets:\*\* Cloud VMs that host the production Docker Swarm nodes.  
-\- \*\*DigitalOcean Managed MongoDB:\*\* Hosted production MongoDB database used by the app and bot.  
-\- \*\*Docker:\*\* Runs the application and infrastructure services in containers.  
-\- \*\*Docker Compose:\*\* Defines and runs the local development environment.  
-\- \*\*Docker Swarm:\*\* Orchestrates the remote production stack across multiple droplets.  
-\- \*\*Docker Hub:\*\* Registry where production images are pushed and pulled from.  
-\- \*\*Vagrant:\*\* Current tool for provisioning DigitalOcean droplets.  
-\- \*\*vagrant-digitalocean:\*\* Vagrant provider plugin/box for creating DigitalOcean droplets.  
-\- \*\*GitHub Actions:\*\* CI/CD platform for tests, static analysis, image builds, releases, and deployments.  
-\- \*\*Nginx:\*\* Reverse proxy in front of the app and Grafana.  
-\- \*\*Certbot:\*\* Automates Let’s Encrypt certificate setup and renewal.  
-\- \*\*Let’s Encrypt:\*\* Issues TLS certificates.  
-\- \*\*UFW:\*\* Host firewall configured during provisioning.  
-\- \*\*Prometheus:\*\* Collects application and service metrics.  
-\- \*\*Grafana:\*\* Displays dashboards for metrics and logs.  
-\- \*\*Loki:\*\* Stores and queries logs.  
-\- \*\*Promtail:\*\* Collects container logs and ships them to Loki.  
-\- \*\*rsyslog:\*\* Older/auxiliary centralized log collection component.  
-\- \*\*Pandoc / LaTeX:\*\* Builds the project report PDF.  
-\- \*\*Firefox / geckodriver / Selenium:\*\* Runs browser-based UI tests.  
-\- \*\*Docker Scout:\*\* Scans Docker images for vulnerabilities.  
-\- \*\*Trivy:\*\* Performs container vulnerability scanning.  
-\- \*\*Semgrep:\*\* Static analysis for security/code patterns.  
-\- \*\*CodeQL SARIF upload:\*\* Uploads scan results to GitHub code scanning.  
-\- \*\*golangci-lint:\*\* Runs Go linting.  
-\- \*\*Hadolint:\*\* Lints Dockerfiles.
+**Higher-Level Dependencies**  
+**DigitalOcean Droplets:** Cloud VMs that host the production Docker Swarm nodes.  
+**DigitalOcean Managed MongoDB:** Hosted production MongoDB database used by the app and bot.  
+**Docker:** Runs the application and infrastructure services in containers.  
+**Docker Compose:** Defines and runs the local development environment.  
+**Docker Swarm:** Orchestrates the remote production stack across multiple droplets.  
+**Docker Hub:** Registry where production images are pushed and pulled from.  
+**Vagrant:** Current tool for provisioning DigitalOcean droplets.  
+**vagrant-digitalocean:** Vagrant provider plugin/box for creating DigitalOcean droplets.  
+**GitHub Actions:** CI/CD platform for tests, static analysis, image builds, releases, and deployments.  
+**Nginx:** Reverse proxy in front of the app and Grafana.  
+**Certbot:** Automates Let’s Encrypt certificate setup and renewal.  
+**Let’s Encrypt:** Issues TLS certificates.  
+**UFW:** Host firewall configured during provisioning.  
+**Prometheus:** Collects application and service metrics.  
+**Grafana:** Displays dashboards for metrics and logs.  
+**Loki:** Stores and queries logs.  
+**Promtail:** Collects container logs and ships them to Loki.  
+**rsyslog:** Older/auxiliary centralized log collection component.  
+**Pandoc / LaTeX:** Builds the project report PDF.  
+**Firefox / geckodriver / Selenium:** Runs browser-based UI tests.  
+**Docker Scout:** Scans Docker images for vulnerabilities.  
+**Trivy:** Performs container vulnerability scanning.  
+**Semgrep:** Static analysis for security/code patterns.  
+**CodeQL SARIF upload:** Uploads scan results to GitHub code scanning.  
+**golangci-lint:** Runs Go linting.  
+**Hadolint:** Lints Dockerfiles.
 
-\*\*Container / Image Dependencies\*\*  
-\- \*\*\`mongo:8.0\`:\*\* Local MongoDB database image.  
-\- \*\*\`grafana/grafana:12.1\`:\*\* Base image for the custom Grafana image.  
-\- \*\*\`prom/prometheus:v3.5.1\`:\*\* Base image for the custom Prometheus image.  
-\- \*\*\`grafana/loki:latest\`:\*\* Loki log storage/query service image.  
-\- \*\*\`grafana/promtail:latest\`:\*\* Promtail log shipper image.  
-\- \*\*\`ubuntu:24.04\`:\*\* Base image for the rsyslog container.  
-\- \*\*\`golang:1.25.10\`:\*\* Build image for compiling the Go web app.  
-\- \*\*\`alpine:3.23\`:\*\* Lightweight runtime image for the Go web app.  
-\- \*\*\`pandoc/latex:3.6\`:\*\* CI image used to build the report PDF.  
-\- \*\*\`curlimages/curl\`:\*\* Small image used for HTTP checks in older/local helper flows.
+**Container / Image Dependencies**  
+**\`mongo:8.0\`:** Local MongoDB database image.  
+**\`grafana/grafana:12.1\`:** Base image for the custom Grafana image.  
+**\`prom/prometheus:v3.5.1\`:** Base image for the custom Prometheus image.  
+**\`grafana/loki:latest\`:** Loki log storage/query service image.  
+**\`grafana/promtail:latest\`:** Promtail log shipper image.  
+**\`ubuntu:24.04\`:** Base image for the rsyslog container.  
+**\`golang:1.25.10\`:** Build image for compiling the Go web app.  
+**\`alpine:3.23\`:** Lightweight runtime image for the Go web app.  
+**\`pandoc/latex:3.6\`:** CI image used to build the report PDF.  
+**\`curlimages/curl\`:** Small image used for HTTP checks in older/local helper flows.
 
-\*\*Main Go App Dependencies\*\*  
-\- \*\*\`github.com/gorilla/mux\`:\*\* HTTP router for app routes.  
-\- \*\*\`github.com/gorilla/sessions\`:\*\* Cookie/session management.  
-\- \*\*\`github.com/prometheus/client\_golang\`:\*\* Exposes Prometheus metrics from the app.  
-\- \*\*\`go.mongodb.org/mongo-driver\`:\*\* MongoDB client driver.  
-\- \*\*\`golang.org/x/crypto\`:\*\* Crypto utilities, including password hashing support.
+**Main Go App Dependencies**  
+**\`github.com/gorilla/mux\`:** HTTP router for app routes.  
+**\`github.com/gorilla/sessions\`:** Cookie/session management.  
+**\`github.com/prometheus/client\_golang\`:** Exposes Prometheus metrics from the app.  
+**\`go.mongodb.org/mongo-driver\`:** MongoDB client driver.  
+**\`golang.org/x/crypto\`:** Crypto utilities, including password hashing support.
 
-\*\*Discord Bot Dependencies\*\*  
-\- \*\*\`github.com/bwmarrin/discordgo\`:\*\* Discord API client library.  
-\- \*\*\`go.mongodb.org/mongo-driver\`:\*\* MongoDB client driver used by the bot.
+**Discord Bot Dependencies**  
+**\`github.com/bwmarrin/discordgo\`:** Discord API client library.  
+**\`go.mongodb.org/mongo-driver\`:** MongoDB client driver used by the bot.
 
-\*\*Important Go Indirect Dependencies\*\*  
-\- \*\*\`github.com/gorilla/securecookie\`:\*\* Secure cookie encoding used by Gorilla sessions.  
-\- \*\*\`github.com/gorilla/websocket\`:\*\* WebSocket support, used indirectly by Discord integration.  
-\- \*\*\`github.com/prometheus/client\_model\`:\*\* Prometheus metric data model.  
-\- \*\*\`github.com/prometheus/common\`:\*\* Shared Prometheus helpers.  
-\- \*\*\`github.com/prometheus/procfs\`:\*\* Reads Linux process metrics for Prometheus.  
-\- \*\*\`github.com/klauspost/compress\`:\*\* Compression support.  
-\- \*\*\`github.com/golang/snappy\`:\*\* Snappy compression support, used by MongoDB-related code.  
-\- \*\*\`github.com/xdg-go/scram\`:\*\* SCRAM authentication support for MongoDB.  
-\- \*\*\`github.com/xdg-go/pbkdf2\`:\*\* Password-based key derivation used in auth flows.  
-\- \*\*\`github.com/xdg-go/stringprep\`:\*\* String preparation used in authentication protocols.  
-\- \*\*\`google.golang.org/protobuf\`:\*\* Protocol Buffers support.  
-\- \*\*\`golang.org/x/sys\`:\*\* Low-level OS/system calls.  
-\- \*\*\`golang.org/x/text\`:\*\* Text encoding and normalization utilities.  
-\- \*\*\`golang.org/x/sync\`:\*\* Extra concurrency helpers.  
-\- \*\*\`golang.org/x/net\`:\*\* Extended networking libraries.
+**Important Go Indirect Dependencies**  
+**\`github.com/gorilla/securecookie\`:** Secure cookie encoding used by Gorilla sessions.  
+**\`github.com/gorilla/websocket\`:** WebSocket support, used indirectly by Discord integration.  
+**\`github.com/prometheus/client\_model\`:** Prometheus metric data model.  
+**\`github.com/prometheus/common\`:** Shared Prometheus helpers.  
+**\`github.com/prometheus/procfs\`:** Reads Linux process metrics for Prometheus.  
+**\`github.com/klauspost/compress\`:** Compression support.  
+**\`github.com/golang/snappy\`:** Snappy compression support, used by MongoDB-related code.  
+**\`github.com/xdg-go/scram\`:** SCRAM authentication support for MongoDB.  
+**\`github.com/xdg-go/pbkdf2\`:** Password-based key derivation used in auth flows.  
+**\`github.com/xdg-go/stringprep\`:** String preparation used in authentication protocols.  
+**\`google.golang.org/protobuf\`:** Protocol Buffers support.  
+**\`golang.org/x/sys\`:** Low-level OS/system calls.  
+**\`golang.org/x/text\`:** Text encoding and normalization utilities.  
+**\`golang.org/x/sync\`:** Extra concurrency helpers.  
+**\`golang.org/x/net\`:** Extended networking libraries.
 
-\*\*Python / Test Dependencies\*\*  
-\- \*\*\`pytest\`:\*\* Python test runner.  
-\- \*\*\`pymongo\`:\*\* Python MongoDB client used by tests.  
-\- \*\*\`selenium\`:\*\* Browser automation for UI tests.  
-\- \*\*\`requests\`:\*\* HTTP client used by simulator/test tooling.
+**Python / Test Dependencies**  
+**\`pytest\`:** Python test runner.  
+**\`pymongo\`:** Python MongoDB client used by tests.  
+**\`selenium\`:** Browser automation for UI tests.  
+**\`requests\`:** HTTP client used by simulator/test tooling.
 
-\*\*GitHub Actions Dependencies\*\*  
-\- \*\*\`actions/checkout\`:\*\* Checks out repository code in CI.  
-\- \*\*\`docker/login-action\`:\*\* Logs CI into Docker Hub.  
-\- \*\*\`docker/setup-buildx-action\`:\*\* Enables Docker Buildx in CI.  
-\- \*\*\`docker/build-push-action\`:\*\* Builds and pushes Docker images.  
-\- \*\*\`actions/setup-go\`:\*\* Installs/configures Go in CI.  
-\- \*\*\`actions/setup-python\`:\*\* Installs/configures Python in CI.  
-\- \*\*\`actions/upload-artifact\`:\*\* Uploads generated artifacts like the report PDF.  
-\- \*\*\`browser-actions/setup-firefox\`:\*\* Installs Firefox for UI tests.  
-\- \*\*\`docker/scout-action\`:\*\* Runs Docker Scout vulnerability checks.  
-\- \*\*\`aquasecurity/trivy-action\`:\*\* Runs Trivy scans.  
-\- \*\*\`golangci/golangci-lint-action\`:\*\* Runs Go linting in CI.  
-\- \*\*\`returntocorp/semgrep-action\`:\*\* Runs Semgrep static analysis.  
-\- \*\*\`softprops/action-gh-release\`:\*\* Creates GitHub releases.  
-\- \*\*\`zwaldowski/semver-release-action\`:\*\* Handles semantic version release automation.  
-\- \*\*\`zwaldowski/match-label-action\`:\*\* Checks labels used for release/version decisions.
+**GitHub Actions Dependencies**  
+**\`actions/checkout\`:** Checks out repository code in CI.  
+**\`docker/login-action\`:** Logs CI into Docker Hub.  
+**\`docker/setup-buildx-action\`:** Enables Docker Buildx in CI.  
+**\`docker/build-push-action\`:** Builds and pushes Docker images.  
+**\`actions/setup-go\`:** Installs/configures Go in CI.  
+**\`actions/setup-python\`:** Installs/configures Python in CI.  
+**\`actions/upload-artifact\`:** Uploads generated artifacts like the report PDF.  
+**\`browser-actions/setup-firefox\`:** Installs Firefox for UI tests.  
+**\`docker/scout-action\`:** Runs Docker Scout vulnerability checks.  
+**\`aquasecurity/trivy-action\`:** Runs Trivy scans.  
+**\`golangci/golangci-lint-action\`:** Runs Go linting in CI.  
+**\`returntocorp/semgrep-action\`:** Runs Semgrep static analysis.  
+**\`softprops/action-gh-release\`:** Creates GitHub releases.  
+**\`zwaldowski/semver-release-action\`:** Handles semantic version release automation.  
+**\`zwaldowski/match-label-action\`:** Checks labels used for release/version decisions.
 
 **Process perspective**
 

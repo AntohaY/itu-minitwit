@@ -55,7 +55,6 @@ jobs:
             ${{ env.REPORT_SOURCE }}
             --from=markdown
             --pdf-engine=xelatex
-            --toc
             --number-sections
             --metadata=date=
             --resource-path=.:report
