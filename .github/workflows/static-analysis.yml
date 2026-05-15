@@ -8,12 +8,21 @@ on:
 
 jobs:
   verify:
-    name: Build and Verify
+    name: Build and Verify (Scan Docker Images for Security Vulnerabilities)
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_AUTHTOKEN }}
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -24,6 +33,56 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+
+      - name: Build Web Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/web/Dockerfile
+          push: false
+          tags: webminitwitimage:latest
+          load: true
+
+      - name: Docker Scout Scan Web Image
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: webminitwitimage:latest
+          only-severities: critical,high
+          exit-code: true
+
+      - name: Build Discord Bot Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./src/bot
+          file: ./src/bot/Dockerfile
+          push: false
+          tags: discordbotimage:latest
+          load: true
+
+      - name: Docker Scout Scans Discord Bot Image
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: discordbotimage:latest
+          only-severities: critical,high
+          exit-code: true
+
+      - name: Run Trivy Scan on Web Image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: webminitwitimage:latest
+          format: sarif
+          output: trivy-web-results.sarif
+          severity: CRITICAL,HIGH
+        continue-on-error: true
+
+      - name: Upload Trivy Results to GitHub
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: trivy-web-results.sarif
+          category: trivy-scan
+        continue-on-error: true
 
       - name: Install golangci-lint
         uses: golangci/golangci-lint-action@v9

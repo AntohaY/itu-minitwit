@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -23,7 +25,6 @@ type User struct {
 	ID       primitive.ObjectID `bson:"_id,omitempty"`
 	Username string             `bson:"username"`
 	Email    string             `bson:"email"`
-	PW       string             `bson:"pw"`
 	HashedPW string             `bson:"hashedpw"`
 }
 
@@ -152,11 +153,17 @@ func (a *APIHandler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	hash, err := bcrypt.GenerateFromPassword([]byte(payload.Pwd), bcrypt.DefaultCost)
+	if err != nil {
+		slog.Error("api register failed to hash password", "error", err.Error(), "request_id", requestID)
+		w.WriteHeader(http.StatusInternalServerError)
+		writeJSON(w, map[string]interface{}{"status": 500, "error_msg": "Internal Server Error"}, requestID)
+		return
+	}
 	newUser := User{
 		Username: payload.Username,
 		Email:    payload.Email,
-		PW:       payload.Pwd,
-		HashedPW: payload.Pwd,
+		HashedPW: string(hash),
 	}
 	if _, err := a.DB.Collection("user").InsertOne(context.TODO(), newUser); err != nil {
 		slog.Error("api register insert failed", "error", err.Error(), "request_id", requestID)

@@ -1,0 +1,61 @@
+name: Report
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  REPORT_SOURCE: report/report.md
+  REPORT_OUTPUT: report/build/MSc_group_p.pdf
+  SOURCE_DATE_EPOCH: "0"
+
+jobs:
+  build-report:
+    name: Build Report PDF
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Prepare report build directory
+        run: mkdir -p report/build
+
+      - name: Check report word count
+        run: |
+          words=$(python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          text = Path("report/report.md").read_text(encoding="utf-8")
+          text = re.sub(r"---\n.*?\n---\n", "", text, flags=re.S)
+          text = re.sub(r"```.*?```", "", text, flags=re.S)
+          text = re.sub(r"\[[^\]]+\]\([^)]+\)", "", text)
+          print(len(re.findall(r"\b[\w'-]+\b", text)))
+          PY
+          )
+          echo "Report word count: ${words}"
+          if [ "${words}" -gt 2500 ]; then
+            echo "::warning title=Report word count::Report has ${words} words, which is above the 2500 word limit."
+          fi
+
+      - name: Build PDF with Pandoc
+        uses: docker://pandoc/latex:3.6
+        with:
+          args: >-
+            report/report.md
+            --from=markdown
+            --pdf-engine=xelatex
+            --toc
+            --number-sections
+            --metadata=date=
+            --output=report/build/MSc_group_p.pdf
+
+      - name: Upload report PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: MSc_group_p
+          path: report/build/MSc_group_p.pdf
