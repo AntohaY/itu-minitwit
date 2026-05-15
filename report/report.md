@@ -1,7 +1,7 @@
   
 
 \begin{center}
-![](images/itu_logo.jpg)
+\includegraphics[width=0.35\textwidth]{images/itu_logo.jpg}
 
 {\LARGE\textbf{Report group P}}
 \end{center}
