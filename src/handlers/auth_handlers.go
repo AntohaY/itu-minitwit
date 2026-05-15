@@ -20,7 +20,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	requestID := requestctx.RequestIDFromRequest(r)
-	slog.Debug("register handler called", "method", r.Method, "request_id", requestID)
+	slog.Info("register handler called", "method", r.Method, "request_id", requestID)
 
 	errMsg := ""
 	if r.Method == http.MethodPost {
@@ -33,7 +33,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		email := r.FormValue("email")
 		password := r.FormValue("password")
 		password2 := r.FormValue("password2")
-		slog.Debug("register attempt", "username", username, "request_id", requestID)
+		slog.Info("register attempt", "username", username, "request_id", requestID)
 
 		if username == "" {
 			errMsg = "You have to enter a username"
@@ -81,7 +81,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("registration validation failed", "reason", errMsg, "request_id", requestID)
 		data.Flashes = append(data.Flashes, errMsg)
 	}
-	slog.Debug("render register page", "request_id", requestID)
+	slog.Info("render register page", "request_id", requestID)
 	app.RenderTemplate(w, "register.html", data)
 }
 

@@ -1,0 +1,122 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "ituminitwitloki"
+      },
+      "description": "All Docker logs collected by Promtail.",
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "ituminitwitloki"
+          },
+          "direction": "backward",
+          "editorMode": "code",
+          "expr": "{job=\"docker\"} | json",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "All Logs",
+      "type": "logs"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "ituminitwitloki"
+      },
+      "description": "Registration-related logs from RegisterHandler.",
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 2,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "ituminitwitloki"
+          },
+          "direction": "backward",
+          "editorMode": "code",
+          "expr": "{job=\"docker\"} | json | msg=~\"register handler called|register attempt|render register page|registration successful|registration validation failed|registration database error|failed to hash password|failed to parse form\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Registration Logs",
+      "type": "logs"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": [
+    "logs",
+    "loki",
+    "registration"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "MiniTwit Logs",
+  "uid": "minitwit-logs-registration",
+  "version": 1,
+  "weekStart": ""
+}
