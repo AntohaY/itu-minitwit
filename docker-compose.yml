@@ -20,7 +20,6 @@ services:
     build:
       context: .
       dockerfile: docker/web/Dockerfile
-    pull_policy: never
     image: ${DOCKER_USERNAME:-antohay}/webminitwitimage:latest
     ports:
       - "8080:8080"
@@ -42,7 +41,10 @@ services:
         order: start-first
       
   prometheus:
-    image: prom/prometheus:latest
+    build:
+      context: ./monitoring/prometheus
+      dockerfile: Dockerfile
+    image: ${DOCKER_USERNAME:-antohay}/prometheus-minitwit:latest
     networks:
       - minitwit-network
     volumes:
@@ -57,7 +59,10 @@ services:
           - node.role == manager
 
   grafana:
-    image: grafana/grafana:latest
+    build:
+      context: ./monitoring/grafana
+      dockerfile: Dockerfile
+    image: ${DOCKER_USERNAME:-antohay}/grafana-minitwit:latest
     ports:
       - "3000:3000"
     environment:
