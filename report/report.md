@@ -1,15 +1,15 @@
   
 
 \begin{center}
-\includegraphics[width=0.35\textwidth]{report/images/itu_logo.jpg}
+\includegraphics[width=1\textwidth]{report/images/itu_logo.jpg}
 
 {\LARGE\textbf{Report group P}}
 \end{center}
 
-### Anton Yakovenko anya@itu.dk
-### Janusz Bekas jdbe@itu.dk
-### Mengdi Liao menl@itu.dk
-### Viktor Horvath vhor@itu.dk
+**Anton Yakovenko anya@itu.dk**
+**Janusz Bekas jdbe@itu.dk**
+**Mengdi Liao menl@itu.dk**
+**Viktor Horvath vhor@itu.dk**
 
 \newpage
 
@@ -209,7 +209,7 @@ We have encountered multiple problems during the development and evolution cycle
 * In our first logging system we struggled with volumes in our server, where we couldn’t export logs and store them outside of the container. Instead of fixing this we moved to promtail and loki.   
 * Some CI/CD operations couldn't be tested directly in our repository, because changes need to be accepted by other team members. That’s why when we were testing github action we used separate repository which was used as sandbox, with full rights 
 
-**Use of Generative AI
+**Use of Generative AI**
 Technologies which we used:
 
 Codex 5.5: for the review of our Docker stack.
