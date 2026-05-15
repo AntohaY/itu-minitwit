@@ -48,6 +48,26 @@ jobs:
           cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/discordbotimage:botbuildcache
           cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/discordbotimage:botbuildcache,mode=max
 
+      - name: Build and push Prometheus image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./monitoring/prometheus
+          file: ./monitoring/prometheus/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/prometheus-minitwit:latest
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/prometheus-minitwit:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/prometheus-minitwit:buildcache,mode=max
+
+      - name: Build and push Grafana image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./monitoring/grafana
+          file: ./monitoring/grafana/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/grafana-minitwit:latest
+          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/grafana-minitwit:buildcache
+          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/grafana-minitwit:buildcache,mode=max
+
   deploy:
     runs-on: ubuntu-latest
     needs: build
