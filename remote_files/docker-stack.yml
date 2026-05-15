@@ -23,11 +23,10 @@ services:
         order: start-first
 
   prometheus:
-    image: prom/prometheus:latest
+    image: ${DOCKER_USERNAME}/prometheus-minitwit:latest
     networks:
       - minitwit-network
     volumes:
-      - /minitwit/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_cloud_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -38,7 +37,7 @@ services:
           - node.role == manager # Keep data tied to this specific node
 
   grafana:
-    image: grafana/grafana:latest
+    image: ${DOCKER_USERNAME}/grafana-minitwit:latest
     ports:
       - "3000:3000"
     environment:
@@ -51,8 +50,6 @@ services:
       - minitwit-network
     volumes:
       - grafana_cloud_data:/var/lib/grafana
-      - /minitwit/monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
-      - /minitwit/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
     deploy:
       placement:
         constraints:
