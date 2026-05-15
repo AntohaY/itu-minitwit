@@ -7,6 +7,8 @@ RESET  := $(shell tput -Txterm sgr0)
 GO_DIR=src
 DOCKER_FILES=$(shell find . -name "Dockerfile*")
 GECKODRIVER_BIN=$(shell command -v geckodriver 2>/dev/null)
+REPORT_SOURCE=report/report.md
+REPORT_OUTPUT=report/build/MSc_group_p.pdf
 
 ci-setup:
 	@echo "$(CYAN)==> Starting containers in background...$(RESET)"
@@ -99,6 +101,17 @@ ui-e2e:
 		exit 1; \
 	}
 
+# ---------- Report ---------------
+
+report:
+	@echo "$(CYAN)==> Building report PDF...$(RESET)"
+	mkdir -p report/build
+	SOURCE_DATE_EPOCH=0 pandoc $(REPORT_SOURCE) --from=markdown --pdf-engine=xelatex --toc --number-sections --metadata=date= --output=$(REPORT_OUTPUT)
+	@echo "$(GREEN)Report built at $(REPORT_OUTPUT)$(RESET)"
+
+report-word-count:
+	@pandoc $(REPORT_SOURCE) -t plain | wc -w
+
 # --------- Execute tests --------------------------
 
 # if one test file, still environment is cleaned up correctly
@@ -111,4 +124,4 @@ verify:
 # Helper to group all checks together
 run-checks: test-sim fmt lint-go lint-docker test
 
-.PHONY: ci-setup test-sim fmt lint-go lint-docker test verify ci-cleanup run-checks wait-web ui-e2e
+.PHONY: ci-setup test-sim fmt lint-go lint-docker test verify ci-cleanup run-checks wait-web ui-e2e report report-word-count
