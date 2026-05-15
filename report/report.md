@@ -1,15 +1,17 @@
   
 
-**![](images/itu_logo.jpg)**  
+\begin{center}
+![](images/itu_logo.jpg)
 
-<h1 align="center">Report group P</h1>
+{\LARGE\textbf{Report group P}}
+\end{center}
 <ul>
     <li><h3>Anton Yakovenko anya@itu.dk</h3></li>
     <li><h3>Janusz Bekas jdbe@itu.dk</h3></li>
     <li><h3>Mengdi Liao menl@itu.dk</h3></li>
     <li><h3>Viktor Horvath vhor@itu.dk</h3></li>
 </ul>
-<div style="page-break-after: always;"></div>
+\newpage
 
 ## Introduction
 
@@ -17,17 +19,15 @@ Itu-minitwit is an evolved version of the MinitTwit project originally written i
 
 The project’s codebase is located on GitHub and utilizes GitHub Actions for CI/CD pipeline. We are using DigitalOcean as our host for Virtual machines and a managed database.
 
-<div style="page-break-after: always;"></div>
+\newpage
 
 ## System perspective
 
-<div align="center">
+\begin{center}
+\includegraphics[width=0.9\textwidth]{images/sys_arch_img.png}
 
-![](images/sys_arch_img.png)
-
-<p><em>System architecture view</em></p>
-
-</div>
+\emph{System architecture view}
+\end{center}
 
 The production runtime is Docker Swarm on DigitalOcean. The Swarm has one manager node, minitwit, and two worker nodes, minitwit-web-1 and minitwit-web-2. The remote stack consists of webserver, prometheus, grafana, loki, promtail, and discordbot services on the overlay network minitwit-network. Manager node consists of a monitoring stack (prometheus, grafana, loki, a promtail replica and webserver replica). Worker nodes have webserver replicas and promtail replicas.
 
@@ -166,12 +166,11 @@ Our CI/CD pipeline ensures security and quality at every stage before deployment
 
 * Create Release on GitHub: The pipeline automatically generates a new version tag (e.g., v1.0.2), versions are saved in our repo and if we would decide that we want to return to previous deployment, we can easily make it  
 
-* **Monitoring**  
+**Monitoring**  
 - We measure time respond of different endpoints using different methodologies (P50 Latency, P95 Latency, P99 Latency)  
 - Total incoming https request for endpoints  
 -  Overall error rate and 4xx and 5xx responds for different endpoints  
 - Request / success / error rate by different endpoints   
--   
     
 **Logging**  
   We are logging failures for different endpoints inside webserver containers. We use promtail to go through the docker container logs and aggregate them for grafana.  
