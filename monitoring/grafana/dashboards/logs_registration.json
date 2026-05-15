@@ -51,7 +51,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{job=\"docker\"} | json",
+          "expr": "{job=\"docker\"} | json | __error__=\"\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -90,7 +90,7 @@
           },
           "direction": "backward",
           "editorMode": "code",
-          "expr": "{job=\"docker\"} | json | msg=~\"register handler called|register attempt|render register page|registration successful|registration validation failed|registration database error|failed to hash password|failed to parse form\"",
+          "expr": "{job=\"docker\"} | json | __error__=\"\" | msg=~\"register handler called|register attempt|render register page|registration successful|registration validation failed|registration database error|failed to hash password|failed to parse form\"",
           "queryType": "range",
           "refId": "A"
         }
