@@ -2,24 +2,27 @@
 
 **![](images/itu_logo.jpg)**  
 
-<h1>Report group P</h1>
+# <center>Report group P</center>
 <ul>
     <li><h3>Anton Yakovenko anya@itu.dk</h3></li>
     <li><h3>Janusz Bekas jdbe@itu.dk</h3></li>
     <li><h3>Mengdi Liao menl@itu.dk</h3></li>
     <li><h3>Viktor Horvath vhor@itu.dk</h3></li>
 </ul>
+<div style="page-break-after: always;"></div>
 
-**Introduction**
+## Introduction
 
 Itu-minitwit is an evolved version of the MinitTwit project originally written in python and Flask. It was re-written in GoLang with the Gorilla webtoolkit framework. We use MongoDB for our database. Loki, Prometheus, Promtail and Grafana are used as a monitoring stack.
 
 The project’s codebase is located on GitHub and utilizes GitHub Actions for CI/CD pipeline. We are using DigitalOcean as our host for Virtual machines and a managed database.
 
-**System perspective**
+<div style="page-break-after: always;"></div>
+
+## System perspective
 
 **![](images/sys_arch_img.png)**  
-System architecture
+<center>System architecture view</center>
 
 The production runtime is Docker Swarm on DigitalOcean. The Swarm has one manager node, minitwit, and two worker nodes, minitwit-web-1 and minitwit-web-2. The remote stack consists of webserver, prometheus, grafana, loki, promtail, and discordbot services on the overlay network minitwit-network. Manager node consists of a monitoring stack (prometheus, grafana, loki, a promtail replica and webserver replica). Worker nodes have webserver replicas and promtail replicas.
 
@@ -32,8 +35,9 @@ Logs are being created in webserver containers, then Promtail runs as a global S
 Graphs are created by prometheus querying the webserver system and passing the information to grafana that interprets information and displays them as informational graphs.
 
 Necessary environment variables are stored in GitHub Secrets.
+<div style="page-break-after: always;"></div>
 
-**Dependencies**
+## Dependencies
 
 **Higher-Level Dependencies**  
 **DigitalOcean Droplets:** Cloud VMs that host the production Docker Swarm nodes.  
@@ -126,11 +130,13 @@ Necessary environment variables are stored in GitHub Secrets.
 **\`zwaldowski/semver-release-action\`:** Handles semantic version release automation.  
 **\`zwaldowski/match-label-action\`:** Checks labels used for release/version decisions.
 
-**Process perspective**
+<div style="page-break-after: always;"></div>
+
+## Process perspective
 
 To manage the workflow, we have created a Discord channel where we discuss our ideas and current problems and how to solve them. During the evolution process, we handled bugs that arose along the way. We gathered them on github issues, from where we had a clear view for them and assigned the person responsible for the fix. Once the solution was found, developers created a pull request to merge their branch with the fix into the development branch, where tests from CI/CD pipeline were run. After the tests were marked as successful PR required at least one review from the team member to merge into the development branch. Then we tried to create a PR from development to main every week to have continuous weekly releases. We kept naming conventions for new branches which we described in the readme file.
 
-### **CI/CD Pipeline: Stages and Tools**
+## CI/CD Pipeline: Stages and Tools
 
 Our CI/CD pipeline ensures security and quality at every stage before deployment. The automated workflow consists of four main stages:
 
@@ -153,7 +159,8 @@ Our CI/CD pipeline ensures security and quality at every stage before deployment
 
 4\. Deployment and Release Triggered only when all previous stages pass successfully.
 
-* Create Release on GitHub: The pipeline automatically generates a new version tag (e.g., v1.0.2), versions are saved in our repo and if we would decide that we want to return to previous deployment, we can easily make it   
+* Create Release on GitHub: The pipeline automatically generates a new version tag (e.g., v1.0.2), versions are saved in our repo and if we would decide that we want to return to previous deployment, we can easily make it  
+
 * **Monitoring**  
 - We measure time respond of different endpoints using different methodologies (P50 Latency, P95 Latency, P99 Latency)  
 - Total incoming https request for endpoints  
@@ -175,7 +182,9 @@ Our CI/CD pipeline ensures security and quality at every stage before deployment
 * **Scaling and availability**  
   We have implemented docker swarm to help with scaling. Furthermore, we are using rolling updates to reduce down time as much as possible. We have 3 replicas for webserver images and a promtail replica for each of webservers to gather all the necessary logs.
 
-**Reflection Perspective**
+<div style="page-break-after: always;"></div>
+
+## Reflection Perspective
 
 **Evolution and refactoring**  
 The app evolved continuously. First we rewrote minitwit in GoLang and MongoDB. Then we introduced the first version of CI/CD pipeline, which only built and published the latest version of the app to the digital ocean host. Then we further improved the quality of the codebase by structuring the project, adding missing features and implementing new ones. Later we improved our CI/CD pipeline to include various security and quality tests.
@@ -184,6 +193,7 @@ The app evolved continuously. First we rewrote minitwit in GoLang and MongoDB. T
 
 - After encountering our first errors, we added a custom logging system that collected all errors caught inside the handler and stored them in separate files. Later, we transitioned to specialized technologies, using Promtail to collect log lines from different containers and Loki to store them.  
    
+<div style="page-break-after: always;"></div>
 
 **Encountered problems**  
 We have encountered multiple problems during the development and evolution cycle. Main ones are:
