@@ -1,0 +1,15 @@
+#cloud-config
+# Mirrors the inline provisioning from the Vagrantfile:
+#   - install Docker via the official get-docker.sh
+#   - leave swarm setup to a separate remote-exec step (run after all droplets exist)
+# Ports are managed by a DO Cloud Firewall in main.tf, not per-host ufw.
+
+package_update: true
+package_upgrade: false
+
+runcmd:
+  - export DEBIAN_FRONTEND=noninteractive
+  - curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+  - sh /tmp/get-docker.sh
+  - systemctl enable --now docker
+  - usermod -aG docker root
