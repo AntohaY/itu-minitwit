@@ -1,16 +1,16 @@
   
 
 \begin{center}
-\includegraphics[width=0.35\textwidth]{images/itu_logo.jpg}
+\includegraphics[width=0.35\textwidth]{report/images/itu_logo.jpg}
 
 {\LARGE\textbf{Report group P}}
 \end{center}
-<ul>
-    <li><h3>Anton Yakovenko anya@itu.dk</h3></li>
-    <li><h3>Janusz Bekas jdbe@itu.dk</h3></li>
-    <li><h3>Mengdi Liao menl@itu.dk</h3></li>
-    <li><h3>Viktor Horvath vhor@itu.dk</h3></li>
-</ul>
+
+### Anton Yakovenko anya@itu.dk
+### Janusz Bekas jdbe@itu.dk
+### Mengdi Liao menl@itu.dk
+### Viktor Horvath vhor@itu.dk
+
 \newpage
 
 ## Introduction
@@ -24,7 +24,7 @@ The project’s codebase is located on GitHub and utilizes GitHub Actions for CI
 ## System perspective
 
 \begin{center}
-\includegraphics[width=0.9\textwidth]{images/sys_arch_img.png}
+\includegraphics[width=0.9\textwidth]{report/images/sys_arch_img.png}
 
 \emph{System architecture view}
 \end{center}
@@ -40,7 +40,7 @@ Logs are being created in webserver containers, then Promtail runs as a global S
 Graphs are created by prometheus querying the webserver system and passing the information to grafana that interprets information and displays them as informational graphs.
 
 Necessary environment variables are stored in GitHub Secrets.
-<div style="page-break-after: always;"></div>
+\newpage
 
 ## Dependencies
 
@@ -135,7 +135,7 @@ Necessary environment variables are stored in GitHub Secrets.
 **\`zwaldowski/semver-release-action\`:** Handles semantic version release automation.  
 **\`zwaldowski/match-label-action\`:** Checks labels used for release/version decisions.
 
-<div style="page-break-after: always;"></div>
+\newpage
 
 ## Process perspective
 
@@ -186,7 +186,7 @@ Our CI/CD pipeline ensures security and quality at every stage before deployment
 **Scaling and availability**  
   We have implemented docker swarm to help with scaling. Furthermore, we are using rolling updates to reduce down time as much as possible. We have 3 replicas for webserver images and a promtail replica for each of webservers to gather all the necessary logs.
 
-<div style="page-break-after: always;"></div>
+\newpage
 
 ## Reflection Perspective
 
@@ -197,7 +197,7 @@ The app evolved continuously. First we rewrote minitwit in GoLang and MongoDB. T
 
 - After encountering our first errors, we added a custom logging system that collected all errors caught inside the handler and stored them in separate files. Later, we transitioned to specialized technologies, using Promtail to collect log lines from different containers and Loki to store them.  
    
-<div style="page-break-after: always;"></div>
+\newpage
 
 **Encountered problems**  
 We have encountered multiple problems during the development and evolution cycle. Main ones are:
@@ -208,3 +208,13 @@ We have encountered multiple problems during the development and evolution cycle
 * During docker swarm creation we forgot to add additional droplets on DigitalOcean and mixed up network and volume names which resulted in a 30 minute downtime;  
 * In our first logging system we struggled with volumes in our server, where we couldn’t export logs and store them outside of the container. Instead of fixing this we moved to promtail and loki.   
 * Some CI/CD operations couldn't be tested directly in our repository, because changes need to be accepted by other team members. That’s why when we were testing github action we used separate repository which was used as sandbox, with full rights 
+
+**Use of Generative AI
+Technologies which we used:
+
+Codex 5.5: for the review of our Docker stack.
+Powerful models such as Claude 4.7 and Gemini: for code review, troubleshooting, and explaining concepts which we couldn't solve by ourselves.
+GitHub Copilot: for coding tips during our work process.
+
+Reflections on the work process:
+Generative AI significantly supported our workflow. With these tools, our project accelerated noticeably, especially when we made errors and the AI models were able to detect them and suggest repair steps. What's more, not only did they help us solve ongoing problems, but they also guided us in understanding new concepts coming from lectures and exercises. However, we had to remain cautious and manually verify the AI's suggestions, as it occasionally lacked the full context of our specific system architecture.
