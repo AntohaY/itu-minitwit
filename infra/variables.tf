@@ -62,3 +62,33 @@ variable "mongo_db_name" {
   description = "Application database name inside the MongoDB cluster."
   default     = "minitwit"
 }
+
+variable "docker_username" {
+  type        = string
+  description = "Docker Hub username whose images will be deployed."
+  default     = "antohay"
+}
+
+variable "discord_token" {
+  type        = string
+  description = "Discord bot token passed to the bot service."
+  sensitive   = true
+}
+
+variable "grafana_admin_user" {
+  type        = string
+  description = "Grafana admin username."
+  default     = "admin"
+}
+
+variable "grafana_admin_password" {
+  type        = string
+  description = "Grafana admin password."
+  sensitive   = true
+}
+
+variable "cookie_secure" {
+  type        = string
+  description = "Set to 'false' to allow session cookies over HTTP (test only). Default 'true' for production HTTPS."
+  default     = "true"
+}

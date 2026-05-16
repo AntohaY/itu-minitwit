@@ -175,3 +175,33 @@ resource "null_resource" "swarm" {
     }
   }
 }
+
+# ---------- App stack deploy (runs after swarm is ready) ----------
+
+resource "null_resource" "deploy" {
+  depends_on = [
+    null_resource.swarm,
+    digitalocean_database_cluster.mongo,
+    digitalocean_database_db.minitwit,
+  ]
+
+  triggers = {
+    manager_id = digitalocean_droplet.manager.id
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+    command     = "${path.module}/deploy-stack.sh"
+    environment = {
+      SSH_KEY                = pathexpand(var.ssh_private_key_path)
+      MANAGER_IP             = digitalocean_droplet.manager.ipv4_address
+      REPO_ROOT              = "${path.module}/.."
+      DOCKER_USERNAME        = var.docker_username
+      MONGO_URI              = "mongodb+srv://${digitalocean_database_cluster.mongo.user}:${digitalocean_database_cluster.mongo.password}@${digitalocean_database_cluster.mongo.host}/${digitalocean_database_db.minitwit.name}?tls=true&authSource=admin"
+      DISCORD_TOKEN          = var.discord_token
+      GRAFANA_ADMIN_USER     = var.grafana_admin_user
+      GRAFANA_ADMIN_PASSWORD = var.grafana_admin_password
+      COOKIE_SECURE          = var.cookie_secure
+    }
+  }
+}
