@@ -86,7 +86,7 @@ func main() {
 		Path:     "/",
 		MaxAge:   86400 * 7,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   os.Getenv("COOKIE_SECURE") != "false",
 	}
 
 	app.DBClient, app.DB = db_setup.ResolveClientDB(app.Config)

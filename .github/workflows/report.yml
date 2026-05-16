@@ -2,15 +2,19 @@ name: Report
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "development" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "development" ]
   workflow_dispatch:
 
 env:
   REPORT_SOURCE: report/report.md
   REPORT_OUTPUT: report/build/MSc_group_p.pdf
+  REPORT_TARGET_BRANCH: development
   SOURCE_DATE_EPOCH: "0"
+
+permissions:
+  contents: write
 
 jobs:
   build-report:
@@ -30,7 +34,9 @@ jobs:
           import re
           from pathlib import Path
 
-          text = Path("report/report.md").read_text(encoding="utf-8")
+          import os
+
+          text = Path(os.environ["REPORT_SOURCE"]).read_text(encoding="utf-8")
           text = re.sub(r"---\n.*?\n---\n", "", text, flags=re.S)
           text = re.sub(r"```.*?```", "", text, flags=re.S)
           text = re.sub(r"\[[^\]]+\]\([^)]+\)", "", text)
@@ -46,16 +52,35 @@ jobs:
         uses: docker://pandoc/latex:3.6
         with:
           args: >-
-            report/report.md
+            ${{ env.REPORT_SOURCE }}
             --from=markdown
             --pdf-engine=xelatex
-            --toc
             --number-sections
             --metadata=date=
-            --output=report/build/MSc_group_p.pdf
+            --variable=graphics
+            --resource-path=.:report
+            --output=${{ env.REPORT_OUTPUT }}
+
+      - name: Commit generated PDF
+        if: github.event_name == 'push' && github.ref_name == env.REPORT_TARGET_BRANCH
+        run: |
+          cp "${REPORT_OUTPUT}" /tmp/MSc_group_p.pdf
+          git fetch origin "${REPORT_TARGET_BRANCH}"
+          git switch -C "${REPORT_TARGET_BRANCH}" "origin/${REPORT_TARGET_BRANCH}"
+          mkdir -p "$(dirname "${REPORT_OUTPUT}")"
+          cp /tmp/MSc_group_p.pdf "${REPORT_OUTPUT}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${REPORT_OUTPUT}"
+          if git diff --cached --quiet; then
+            echo "No report PDF changes to commit."
+          else
+            git commit -m "Update generated report PDF [skip ci]"
+            git push origin "HEAD:${REPORT_TARGET_BRANCH}"
+          fi
 
       - name: Upload report PDF
         uses: actions/upload-artifact@v4
         with:
           name: MSc_group_p
-          path: report/build/MSc_group_p.pdf
+          path: ${{ env.REPORT_OUTPUT }}

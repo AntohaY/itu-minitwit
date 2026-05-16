@@ -2,7 +2,7 @@
 
 ## Git and branches <br> 
 Naming convention:
-{fix/feature}/week-{assignment_number_of_week}/{short_message}
+{fix/feature}//{short_message}
 
 ## CI/CD
 ### Project infrastructure is setup with Vagrant. Run _vagrant up_ to create virtual machines (droplets) on Digital Ocean.
