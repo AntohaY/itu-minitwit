@@ -9,7 +9,7 @@ on:
 
 env:
   REPORT_SOURCE: report/report.md
-  REPORT_OUTPUT: report/build/MSc_group_p.pdf
+  REPORT_OUTPUT: report/build/report.pdf
   REPORT_TARGET_BRANCH: development
   SOURCE_DATE_EPOCH: "0"
 
@@ -52,14 +52,21 @@ jobs:
           fi
 
       - name: Build PDF
+        uses: baileyjm02/markdown-to-pdf@v1
+        with:
+          input_dir: report
+          output_dir: report/build
+          images_dir: report/images
+          image_import: ./images
+          build_html: false
+
+      - name: Check generated PDF
         run: |
-          npx --yes md-to-pdf "${REPORT_SOURCE}" --basedir report
-          if [ ! -f report/report.pdf ]; then
-            echo "::error title=Report PDF missing::md-to-pdf did not create report/report.pdf."
-            find report -maxdepth 3 -type f -name '*.pdf' -print
+          if [ ! -f "${REPORT_OUTPUT}" ]; then
+            echo "::error title=Report PDF missing::Expected ${REPORT_OUTPUT} to be generated."
+            find report -maxdepth 4 -type f -print
             exit 1
           fi
-          mv report/report.pdf "${REPORT_OUTPUT}"
           ls -lh "${REPORT_OUTPUT}"
 
       - name: Commit generated PDF
@@ -79,6 +86,6 @@ jobs:
       - name: Upload report PDF
         uses: actions/upload-artifact@v4
         with:
-          name: MSc_group_p
+          name: report
           path: ${{ env.REPORT_OUTPUT }}
           
