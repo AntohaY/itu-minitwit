@@ -143,7 +143,7 @@ Necessary environment variables are stored in GitHub Secrets.
 
 ## Process perspective
 
-To manage the workflow, we created a Discord channel where we discuss ideas, raise current problems, and decide how to solve them. During the evolution of the project, we tracked bugs as GitHub issues, which gave us a clear view of open work and let us assign owners for each fix. Once a solution was ready, the developer opened a pull request from their feature branch into `development`, where the CI/CD pipeline ran the full test suite. After CI passed, the PR required at least one review from another team member before it could be merged. We aimed to open a `development` → `main` PR every week to keep a steady cadence of weekly releases. Branch naming conventions are documented in the project README.
+To manage the workflow, we created a Discord channel where we discuss ideas, raise current problems, and decide how to solve them. During the evolution of the project, we tracked bugs as GitHub issues, which gave us a clear view of open work and let us assign owners for each fix. Once a solution was ready, the developer opened a pull request from their feature branch into `development`, where the CI/CD pipeline ran the full test suite. After CI passed, the PR required at least one review from another team member before it could be merged. We aimed to open a `development` → `main` PR every week to keep a steady flow of weekly releases. Branch naming conventions are documented in the project README.
 
 ## CI/CD Pipeline: Stages and Tools
 
