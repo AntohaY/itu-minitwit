@@ -232,8 +232,6 @@ The app evolved continuously. First we rewrote MiniTwit in Go and MongoDB. Then 
 
 After encountering our first errors, we added a custom logging system that collected all errors caught inside the handler and stored them in separate files. Later, we transitioned to specialized technologies, using Promtail to collect log lines from different containers and Loki to store them.
 
-<div style="page-break-after: always;"></div>
-
 ### Encountered Problems
 
 We encountered multiple problems during development and evolution. The main ones:
