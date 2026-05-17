@@ -23,7 +23,7 @@ Public site: <https://itu-minitwit.me>
 | [.github/workflows/](.github/workflows/) | CI (static analysis, tests, E2E) and CD (build → push → deploy) |
 | [Vagrantfile](Vagrantfile), [setup-swarm.sh](setup-swarm.sh) | Legacy provisioning path (still works) |
 | [docker-compose.yml](docker-compose.yml) | Local dev stack |
-| [report/](report/) | Course report (LaTeX/Pandoc) |
+| [report/](report/) | Report in PDF format |
 
 ---
 
@@ -139,7 +139,5 @@ Each request gets an `X-Request-ID` propagated through context; all user-supplie
 ## Reports & releases
 
 ```bash
-make report      # build the course report PDF via pandoc/xelatex
+make report      # build the course report PDF
 ```
-
-The generated PDF is committed back to the repo automatically by [`.github/workflows/report.yml`](.github/workflows/report.yml).
