@@ -60,15 +60,6 @@ jobs:
           image_import: ./images
           build_html: false
 
-      - name: Check generated PDF
-        run: |
-          if [ ! -f "${REPORT_OUTPUT}" ]; then
-            echo "::error title=Report PDF missing::Expected ${REPORT_OUTPUT} to be generated."
-            find report -maxdepth 4 -type f -print
-            exit 1
-          fi
-          ls -lh "${REPORT_OUTPUT}"
-
       - name: Commit generated PDF
         if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name == env.REPORT_TARGET_BRANCH
         run: |
@@ -82,6 +73,15 @@ jobs:
             git commit -m "Update generated report PDF [skip ci]"
             git push origin "HEAD:${REPORT_TARGET_BRANCH}"
           fi
+
+      - name: Check generated PDF
+        run: |
+          if [ ! -f "${REPORT_OUTPUT}" ]; then
+            echo "::error title=Report PDF missing::Expected ${REPORT_OUTPUT} to be generated."
+            find report -maxdepth 4 -type f -print
+            exit 1
+          fi
+          ls -lh "${REPORT_OUTPUT}"
 
       - name: Upload report PDF
         uses: actions/upload-artifact@v4
