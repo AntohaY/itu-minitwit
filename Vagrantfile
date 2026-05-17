@@ -55,11 +55,22 @@ Vagrant.configure("2") do |config|
         # Allowing SSH connections
         sudo ufw allow "OpenSSH"
 
-        # Open the published MiniTwit HTTP port.
+        # Open public HTTP/HTTPS only through Nginx.
         sudo ufw allow 80/tcp
+        sudo ufw allow 443/tcp
 
-        # Open Grafana for external dashboard access.
-        sudo ufw allow 3000/tcp
+        # Block direct access to services that should only be reached through Nginx.
+        sudo ufw deny 3000/tcp
+        sudo ufw deny 8080/tcp
+
+        # Docker can publish ports before UFW sees the traffic. Block public
+        # access to those published container ports in Docker's user chain using iptables firewall.
+        sudo iptables -C DOCKER-USER -p tcp ! -s 127.0.0.0/8 --dport 3000 -j DROP 2>/dev/null || sudo iptables -I DOCKER-USER -p tcp ! -s 127.0.0.0/8 --dport 3000 -j DROP
+        sudo iptables -C DOCKER-USER -p tcp ! -s 127.0.0.0/8 --dport 8080 -j DROP 2>/dev/null || sudo iptables -I DOCKER-USER -p tcp ! -s 127.0.0.0/8 --dport 8080 -j DROP
+        echo iptables-persistent iptables-persistent/autosave_v4 boolean true | sudo debconf-set-selections
+        echo iptables-persistent iptables-persistent/autosave_v6 boolean true | sudo debconf-set-selections
+        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent
+        sudo netfilter-persistent save
 
         # Enable the firewall only after SSH is allowed, otherwise provisioning
         # risks locking us out on a fresh host.

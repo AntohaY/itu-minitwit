@@ -106,11 +106,12 @@ ui-e2e:
 report:
 	@echo "$(CYAN)==> Building report PDF...$(RESET)"
 	mkdir -p report/build
-	SOURCE_DATE_EPOCH=0 pandoc $(REPORT_SOURCE) --from=markdown --pdf-engine=xelatex --toc --number-sections --metadata=date= --output=$(REPORT_OUTPUT)
+	npx --yes md-to-pdf $(REPORT_SOURCE) --basedir report
+	mv report/report.pdf $(REPORT_OUTPUT)
 	@echo "$(GREEN)Report built at $(REPORT_OUTPUT)$(RESET)"
 
 report-word-count:
-	@pandoc $(REPORT_SOURCE) -t plain | wc -w
+	@python3 -c 'import re, pathlib; text = pathlib.Path("$(REPORT_SOURCE)").read_text(encoding="utf-8"); text = re.sub(r"---\n.*?\n---\n", "", text, flags=re.S); text = re.sub(r"```.*?```", "", text, flags=re.S); text = re.sub(r"<[^>]+>", "", text); text = re.sub(r"\[[^\]]+\]\([^)]+\)", "", text); print(len(re.findall(r"\b[\w'\''-]+\b", text)))'
 
 # --------- Execute tests --------------------------
 

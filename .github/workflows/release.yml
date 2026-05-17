@@ -52,3 +52,4 @@ jobs:
           tag_name: ${{ steps.next_version.outputs.version }}
           name: Release ${{ steps.next_version.outputs.version }}
           generate_release_notes: true
+          files: report/build/MSc_group_p.pdf

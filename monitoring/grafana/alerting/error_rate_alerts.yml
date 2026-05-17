@@ -1,0 +1,193 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: Error Rate Alerts
+    folder: Error Rate Dashboard
+    interval: 30s
+    rules:
+      - uid: error_rate_above_10_percent
+        title: Error rate above 10%
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: ituminitwitprometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: ituminitwitprometheus
+              editorMode: code
+              expr: |
+                (
+                  sum(rate(minitwit_http_responses_total{status=~"[45].."}[5m])) /
+                  sum(rate(minitwit_http_responses_total[5m]))
+                ) * 100
+              instant: true
+              intervalMs: 1000
+              legendFormat: Error Rate %
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: []
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 10
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        dashboardUid: error_rate
+        panelId: 4
+        noDataState: OK
+        execErrState: Error
+        for: 0s
+        annotations:
+          summary: Error rate is above 10%
+          description: Overall 5-minute HTTP error rate is above 10%.
+        labels:
+          severity: warning
+        isPaused: false
+  - orgId: 1
+    name: App Availability Alerts
+    folder: Time Respond Dashboard
+    interval: 30s
+    rules:
+      - uid: app_down
+        title: App is down
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: ituminitwitprometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: ituminitwitprometheus
+              editorMode: code
+              expr: up{job="itu-minittwit-app"}
+              instant: true
+              intervalMs: 1000
+              legendFormat: Application Status
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params: []
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - B
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: A
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: last
+              refId: B
+              type: reduce
+          - refId: C
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: B
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: threshold
+        dashboardUid: Time_respond
+        panelId: 1
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          summary: App is down
+          description: Prometheus cannot scrape the Minitwit app target, or the app is reporting up < 1.
+        labels:
+          severity: critical
+        isPaused: false
