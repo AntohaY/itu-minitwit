@@ -2,9 +2,9 @@ name: Report
 
 on:
   push:
-    branches: [ "main", "development" ]
+    branches: [ "development" ]
   pull_request:
-    branches: [ "main", "development" ]
+    branches: [ "development" ]
   workflow_dispatch:
 
 env:

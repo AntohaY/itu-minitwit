@@ -16,6 +16,9 @@ on:
       - main  # Trigger only when code is merged into main
     types: [closed]
 
+env:
+  REPORT_OUTPUT: report/build/MSc_group_p.pdf
+
 permissions:
   contents: write  # Allows the robot to create tags and releases
 
@@ -45,10 +48,24 @@ jobs:
           bump: ${{ steps.bump.outputs.match }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      # 3. This step actually creates the release
+      # 3. Build the report PDF so it can be attached to the release
+      - name: Prepare report build directory
+        run: mkdir -p report/build
+
+      - name: Build report PDF
+        uses: baileyjm02/markdown-to-pdf@v1
+        with:
+          input_dir: report
+          output_dir: report/build
+          images_dir: report/images
+          image_import: ./images
+          build_html: false
+
+      # 4. This step actually creates the release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.next_version.outputs.version }}
           name: Release ${{ steps.next_version.outputs.version }}
           generate_release_notes: true
+          files: ${{ env.REPORT_OUTPUT }}
