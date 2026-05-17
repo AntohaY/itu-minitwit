@@ -253,6 +253,13 @@ We encountered multiple problems during development and evolution. The main ones
 - **Claude 4.7 and Gemini** — Code review, troubleshooting, and explaining concepts we couldn't solve on our own.
 - **GitHub Copilot** — Coding suggestions during day-to-day work.
 
-**Reflections on the work process:**
-
 Generative AI significantly supported our workflow. With these tools, our project accelerated noticeably — especially when we made errors and the AI models were able to detect them and suggest repair steps. They also helped us understand new concepts from lectures and exercises. We remained cautious and manually verified suggestions, as the models occasionally lacked the full context of our specific system architecture.
+
+<div style="page-break-after: always;"></div>
+
+## Reflections on the work process
+
+During this project we tried to follow DevOps practices. We communicated actively throughout the developmennt process to indentify and solve issues as they came up. We tried to manage the workload and distribute tasks. 
+Furthermore, we tried to experiment and improvise during the development as much as time allowed.
+We followed weekly release schedule and automated various tests and checks to avoid unnecessary manual work. We utilized GitHub infrastructure to check each others work using Pull Requests.
+We have learned what works and on what we should work on to improve ourselves as developers in the future.
