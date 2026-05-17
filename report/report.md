@@ -4,7 +4,7 @@
   <img src="./images/itu_logo.jpg" width="100%" alt="ITU logo">
 </p>
 
-<h1 align="center">Report group P</h1>
+<h1 align="center">Report by group p "EastOps"</h1>
 
 <ul align="right" style="list-style-position: inside;">
   <li><strong>Anton Yakovenko</strong> anya@itu.dk</li>
