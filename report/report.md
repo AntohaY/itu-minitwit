@@ -169,8 +169,9 @@ Our CI/CD pipeline ensures security and quality at every stage before deployment
 **Monitoring**  
 - We measure time respond of different endpoints using different methodologies (P50 Latency, P95 Latency, P99 Latency)  
 - Total incoming https request for endpoints  
--  Overall error rate and 4xx and 5xx responds for different endpoints  
-- Request / success / error rate by different endpoints   
+- Overall error rate and 4xx and 5xx responds for different endpoints  
+- Request / success / error rate by different endpoints
+- We have setup alert system on Grafana that sends messages to our Discord channel when the App is down and when total error % exceeds 10%
     
 **Logging**  
   We are logging failures for different endpoints inside webserver containers. We use promtail to go through the docker container logs and aggregate them for grafana.  
