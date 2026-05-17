@@ -290,7 +290,7 @@
             "uid": "ituminitwitprometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (status, path) (rate(minitwit_http_responses_total{status=~\"[45..]\"}[5m]))",
+          "expr": "sum by (status, path) (rate(minitwit_http_responses_total{status=~\"[45]..\"}[5m]))",
           "legendFormat": "{{status}} {{path}}",
           "range": true,
           "refId": "A"
