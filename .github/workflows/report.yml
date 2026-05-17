@@ -58,7 +58,7 @@ jobs:
           build_html: false
 
       - name: Rename report PDF
-        run: mv report/build/report.pdf "${REPORT_OUTPUT}"
+        run: mv report/build/MSc_group_p.pdf "${REPORT_OUTPUT}"
 
       - name: Commit generated PDF
         if: github.event_name == 'push' && github.ref_name == env.REPORT_TARGET_BRANCH
