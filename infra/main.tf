@@ -63,17 +63,6 @@ resource "digitalocean_firewall" "swarm" {
     port_range       = "443"
     source_addresses = ["0.0.0.0/0", "::/0"]
   }
-  inbound_rule {
-    protocol         = "tcp"
-    port_range       = "3000"
-    source_addresses = ["0.0.0.0/0", "::/0"]
-  }
-  inbound_rule {
-    protocol         = "tcp"
-    port_range       = "8080"
-    source_addresses = ["0.0.0.0/0", "::/0"]
-  }
-
   # Swarm node-to-node communication, restricted to the cluster's own droplets.
   inbound_rule {
     protocol    = "tcp"

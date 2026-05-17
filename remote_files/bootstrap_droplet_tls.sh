@@ -34,6 +34,17 @@ echo "Configuring firewall (ufw) if available..."
 if command -v ufw >/dev/null 2>&1; then
   ufw allow OpenSSH || true
   ufw allow 'Nginx Full' || true
+  ufw deny 3000/tcp || true
+  ufw deny "${APP_UPSTREAM_PORT}/tcp" || true
+fi
+
+if command -v iptables >/dev/null 2>&1; then
+  iptables -C DOCKER-USER -p tcp ! -s 127.0.0.0/8 --dport 3000 -j DROP 2>/dev/null || iptables -I DOCKER-USER -p tcp ! -s 127.0.0.0/8 --dport 3000 -j DROP
+  iptables -C DOCKER-USER -p tcp ! -s 127.0.0.0/8 --dport "${APP_UPSTREAM_PORT}" -j DROP 2>/dev/null || iptables -I DOCKER-USER -p tcp ! -s 127.0.0.0/8 --dport "${APP_UPSTREAM_PORT}" -j DROP
+  echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
+  echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
+  DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent
+  netfilter-persistent save
 fi
 
 NGINX_CONF_PATH="/etc/nginx/sites-available/${DOMAIN}.conf"

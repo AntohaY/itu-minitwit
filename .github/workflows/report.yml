@@ -48,27 +48,21 @@ jobs:
             echo "::warning title=Report word count::Report has ${words} words, which is above the 2500 word limit."
           fi
 
-      - name: Build PDF with Pandoc
-        uses: docker://pandoc/latex:3.6
+      - name: Build PDF
+        uses: baileyjm02/markdown-to-pdf@v1
         with:
-          args: >-
-            ${{ env.REPORT_SOURCE }}
-            --from=markdown
-            --pdf-engine=xelatex
-            --number-sections
-            --metadata=date=
-            --variable=graphics
-            --resource-path=.:report
-            --output=${{ env.REPORT_OUTPUT }}
+          input_dir: report
+          output_dir: report/build
+          images_dir: report/images
+          image_import: ./images
+          build_html: false
+
+      - name: Rename report PDF
+        run: mv report/build/report.pdf "${REPORT_OUTPUT}"
 
       - name: Commit generated PDF
         if: github.event_name == 'push' && github.ref_name == env.REPORT_TARGET_BRANCH
         run: |
-          cp "${REPORT_OUTPUT}" /tmp/MSc_group_p.pdf
-          git fetch origin "${REPORT_TARGET_BRANCH}"
-          git switch -C "${REPORT_TARGET_BRANCH}" "origin/${REPORT_TARGET_BRANCH}"
-          mkdir -p "$(dirname "${REPORT_OUTPUT}")"
-          cp /tmp/MSc_group_p.pdf "${REPORT_OUTPUT}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "${REPORT_OUTPUT}"
@@ -84,3 +78,4 @@ jobs:
         with:
           name: MSc_group_p
           path: ${{ env.REPORT_OUTPUT }}
+          
