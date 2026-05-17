@@ -61,8 +61,6 @@ There are two provisioning paths:
 
 ### Terraform
 
-See **[infra/README.md](infra/README.md)** for full details.
-
 ```bash
 cd infra
 cp terraform.tfvars.example terraform.tfvars   # fill in tls_email, discord_token, grafana_admin_password, …
