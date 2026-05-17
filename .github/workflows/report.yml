@@ -29,6 +29,7 @@ jobs:
         run: |
           mkdir -p report/build
           find report/build -type f -name '*.pdf' -delete
+          rm -f report/report.pdf
 
       - name: Check report word count
         run: |
@@ -51,25 +52,14 @@ jobs:
           fi
 
       - name: Build PDF
-        uses: baileyjm02/markdown-to-pdf@v1
-        with:
-          input_path: ${{ env.REPORT_SOURCE }}
-          output_dir: report/build
-          images_dir: report/images
-          image_import: ./images
-          build_html: false
-
-      - name: Move generated PDF to report output path
         run: |
-          generated_pdf="$(find report/build -type f -name '*.pdf' ! -path "${REPORT_OUTPUT}" -print -quit)"
-          if [ -n "${generated_pdf}" ]; then
-            mv "${generated_pdf}" "${REPORT_OUTPUT}"
-          fi
-          if [ ! -f "${REPORT_OUTPUT}" ]; then
-            echo "::error title=Report PDF missing::No generated PDF was found in report/build."
-            find report/build -maxdepth 3 -type f -print
+          npx --yes md-to-pdf "${REPORT_SOURCE}" --basedir report
+          if [ ! -f report/report.pdf ]; then
+            echo "::error title=Report PDF missing::md-to-pdf did not create report/report.pdf."
+            find report -maxdepth 3 -type f -name '*.pdf' -print
             exit 1
           fi
+          mv report/report.pdf "${REPORT_OUTPUT}"
           ls -lh "${REPORT_OUTPUT}"
 
       - name: Commit generated PDF
