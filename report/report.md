@@ -29,9 +29,9 @@ The codebase lives on GitHub and uses GitHub Actions for the CI/CD pipeline. Dig
 
 <p align="center"><em>System architecture view</em></p>
 
-The production runtime is Docker Swarm on DigitalOcean. The Swarm has one manager node, minitwit, and two worker nodes, minitwit-web-1 and minitwit-web-2. The remote stack consists of webserver, prometheus, grafana, loki, promtail, and discordbot services on the overlay network minitwit-network. Manager node consists of a monitoring stack (prometheus, grafana, loki, a promtail replica and webserver replica). Worker nodes have webserver replicas and promtail replicas.
+The production runtime is Docker Swarm on DigitalOcean. The Swarm has one manager node, **minitwit**, and two worker nodes, **minitwit-web-1** and **minitwit-web-2**. The remote stack consists of webserver, prometheus, grafana, loki, promtail, and discordbot services on the overlay network minitwit-network. Manager node consists of a monitoring stack (prometheus, grafana, loki, Discord bot, a promtail replica and webserver replica). Worker nodes have webserver replicas and promtail replicas.
 
-The infrastructure itself is provisioned by Terraform (`infra/`). A single `terraform apply` creates the three droplets with Docker pre-installed via cloud-init, a DigitalOcean Cloud Firewall, a managed MongoDB cluster, and a DO Project to group them. Two `null_resource` blocks then run `swarm-setup.sh` to initialize the Swarm and `deploy-stack.sh` to upload the stack files and trigger `deploy.sh` on the manager.
+The infrastructure itself is provisioned by Vagrant, but can also be provisioned from Terraform (`infra/`). A single `terraform apply` creates the three droplets with Docker pre-installed via cloud-init, a DigitalOcean Cloud Firewall, a managed MongoDB cluster, and a DO Project to group them. Two `null_resource` blocks then run `swarm-setup.sh` to initialize the Swarm and `deploy-stack.sh` to upload the stack files and trigger `deploy.sh` on the manager.
 
 The web application and Discord bot both connect to the database through `MONGO_URI`.
 
@@ -50,7 +50,7 @@ Necessary environment variables are stored in GitHub Secrets.
 - **Docker Compose** — Defines and runs the local development environment.
 - **Docker Swarm** — Orchestrates the remote production stack across multiple droplets.
 - **Docker Hub** — Registry where production images are pushed and pulled from.
-- **Vagrant** — Current tool for provisioning DigitalOcean droplets.
+- **Vagrant** — Tool for provisioning DigitalOcean droplets.
 - **vagrant-digitalocean** — Vagrant provider plugin/box for creating DigitalOcean droplets.
 - **GitHub Actions** — CI/CD platform for tests, static analysis, image builds, releases, and deployments.
 - **Nginx** — Reverse proxy in front of the app and Grafana.
@@ -80,7 +80,6 @@ Necessary environment variables are stored in GitHub Secrets.
 - `ubuntu:24.04` — Base image for the rsyslog container.
 - `golang:1.25.10` — Build image for compiling the Go web app.
 - `alpine:3.23` — Lightweight runtime image for the Go web app.
-- `pandoc/latex:3.6` — CI image used to build the report PDF.
 - `curlimages/curl` — Small image used for HTTP checks in older/local helper flows.
 
 ### Main Go App Dependencies
@@ -213,12 +212,12 @@ We ran CI's static-analysis stack (golangci-lint, hadolint, Trivy, Semgrep) agai
 | golangci-lint | `src/` | 0 issues |
 | golangci-lint | `src/bot/` | 3 errcheck issues |
 | hadolint | 6 Dockerfiles | 0 issues |
-| Trivy — CVEs | both `go.mod` | 0 |
+| Trivy — CVEs | web + bot images | 0 |
 | Trivy — Dockerfile misconfig | 6 Dockerfiles | 4 HIGH, 6 LOW |
 | Trivy — secrets | tracked tree | 0 |
 | Semgrep (364 rules) | 93 files | 9 blocking |
 
-**In short.** 3 of the 9 Semgrep findings are false positives (MD5 only for Gravatar URLs, `http.ListenAndServe` runs behind nginx TLS, the gorilla/sessions cookie is set with `Secure: os.Getenv("COOKIE_SECURE") != "false"`). One is in test-fixture code. The remaining 5 are real: flash-message cookies in `helpers/flashes/flashes.go` lack `HttpOnly`/`Secure`, and the rsyslog Dockerfile is missing a `USER` directive.
+For more context ragrding errors refer to CI/CD pipelines.
 
 <div style="page-break-after: always;"></div>
 
@@ -226,7 +225,7 @@ We ran CI's static-analysis stack (golangci-lint, hadolint, Trivy, Semgrep) agai
 
 ### Evolution and Refactoring
 
-The app evolved continuously. First we rewrote MiniTwit in Go and MongoDB. Then we introduced the first version of our CI/CD pipeline, which only built and published the latest version of the app to the DigitalOcean host. Next we improved the codebase by restructuring the project, adding missing features, and implementing new ones. We later expanded the CI/CD pipeline to include various security and quality tests. Most recently, we migrated infrastructure provisioning from a Vagrantfile + shell scripts to Terraform, replacing imperative VM creation with a declarative IaC setup that brings up droplets, Cloud Firewall, managed MongoDB, the Swarm bootstrap, and the full app deploy in a single `terraform apply`.
+The app evolved continuously. First we rewrote MiniTwit in Go and MongoDB. Then we introduced the first version of our CI/CD pipeline, which only built and published the latest version of the app to the DigitalOcean host. Next we improved the codebase by restructuring the project, adding missing features, and implementing new ones. We later expanded the CI/CD pipeline to include various security and quality tests. Most recently, we added infrastructure provisioning with Terraform, replacing imperative VM creation with a declarative IaC setup that brings up droplets, Cloud Firewall, managed MongoDB, the Swarm bootstrap, and the full app deploy in a single `terraform apply`.
 
 ### Operation and Maintenance
 
