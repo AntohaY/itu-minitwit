@@ -57,6 +57,11 @@ jobs:
           image_import: ./images
           build_html: false
 
+      - name: Rename generated PDF
+        run: |
+          mv report/build/report.pdf "${REPORT_OUTPUT}"
+          ls -lh "${REPORT_OUTPUT}"
+
       - name: Commit generated PDF
         if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name == env.REPORT_TARGET_BRANCH
         run: |

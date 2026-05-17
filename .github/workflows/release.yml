@@ -61,6 +61,11 @@ jobs:
           image_import: ./images
           build_html: false
 
+      - name: Rename generated PDF
+        run: |
+          mv report/build/report.pdf "${REPORT_OUTPUT}"
+          ls -lh "${REPORT_OUTPUT}"
+
       # 4. This step actually creates the release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
